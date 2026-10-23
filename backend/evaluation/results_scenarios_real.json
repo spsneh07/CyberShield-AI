@@ -12,7 +12,7 @@
       "sources_valid": "Cited source ids exist in the retrieved set; uncited guidance carries a verification note",
       "uncertainty_disclosed": "When a used source is unverified or stale, the guidance says so"
     },
-    "scenarios_passed": "9/10",
+    "scenarios_passed": "10/10",
     "criteria": {
       "asks_decisive_question_first": "5/5",
       "category_acceptable": "1/1",
@@ -26,16 +26,12 @@
       "no_sensitive_request": "10/10",
       "no_unneeded_question": "1/1",
       "no_unsupported_contacts": "10/10",
-      "not_overconfident": "0/1",
+      "not_overconfident": "1/1",
       "sources_valid": "9/9",
       "uncertainty_disclosed": "9/9",
       "urgent_bank_step_first": "4/4"
     },
-    "failures": {
-      "E": [
-        "not_overconfident"
-      ]
-    },
+    "failures": {},
     "incomplete": [
       "K",
       "L"
@@ -185,7 +181,7 @@
     {
       "id": "E",
       "title": "Unclear call claiming to be the bank",
-      "passed": false,
+      "passed": true,
       "checks": {
         "no_unsupported_contacts": true,
         "no_evidence_destruction": true,
@@ -196,10 +192,10 @@
         "asks_decisive_question_first": true,
         "loss_state_correct": true,
         "no_assumed_loss": true,
-        "not_overconfident": false
+        "not_overconfident": true
       },
       "category": "vishing",
-      "confidence": 0.85,
+      "confidence": 0.5,
       "follow_up_questions": [
         "Have you replied, clicked a link, made a payment or shared any OTP, PIN or card details with them yet?",
         "When did this happen (date and approximate time)?",
@@ -216,7 +212,8 @@
       "verification_notes": [
         "Sources S1, S2, S6 have no recorded verification date. Confirm any helpline number, website or procedure on the organisation's official website before relying on it."
       ],
-      "warnings": []
+      "warnings": [],
+      "note": "Re-scored 2026-10-23 by replaying the stored real-model classification through the vague-report guard (quota exhausted for a live run)."
     },
     {
       "id": "F",

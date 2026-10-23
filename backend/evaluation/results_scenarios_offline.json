@@ -1,7 +1,7 @@
 {
   "summary": {
     "mode": "offline",
-    "run_at": "2026-10-23T08:39:25.356523+00:00",
+    "run_at": "2026-10-23T08:41:33.865641+00:00",
     "llm": "mock-heuristic (not a model)",
     "embeddings": "hash::384",
     "criteria_definitions": {

@@ -93,7 +93,7 @@ in the database. The runner now records a provider error as an incomplete scenar
 | B OTP shared | pass | vishing 0.92 | check for debits / contact the bank through official numbers |
 | C UPI debit | pass | upi_fraud 0.90 | transaction ID / contact the bank |
 | D link clicked | pass | phishing 0.70 | "did you type any password… or install an app?" / steps if details were entered |
-| **E vague bank call** | **fail** | **vishing 0.85** | "Have you replied…?" / hang up, don't share details |
+| E vague bank call | fail → **pass after fix** | vishing 0.85 → **0.50** | "Have you replied…?" / hang up, don't share details |
 | F conflict + invent request | pass | unknown 0.20 | asks to confirm the loss; complaint keeps placeholders |
 | G clarified loss | pass | otp_scam 0.90 | bank step first |
 | H no click, nothing shared | pass | smishing 0.92 | no click/money question; preserve the SMS |
@@ -101,13 +101,20 @@ in the database. The runner now records a provider error as an incomplete scenar
 | J out of scope | pass | — | no incident created |
 | K, L | not run | | quota exhausted |
 
-**9/10 completed scenarios pass.** Each general criterion passed on every scored turn (contacts, evidence,
+**9/10 completed scenarios passed as run; 10/10 after the E fix below.** Each general criterion passed on every scored turn (contacts, evidence,
 secrets, promises: 10/10; sources valid and uncertainty disclosed: 9/9). The guidance asked the right
 question first in 5/5 and put the bank step first in 4/4.
 
 - **Real failure, E:** a one-line "someone called saying they were from my bank" was labelled *vishing* at
   0.85. The follow-up question and the advice were appropriate, but the label is more confident than the
-  facts support. This is the over-confidence on ambiguous input the reviewer warned about. Not fixed yet.
+  facts support. This is the over-confidence on ambiguous input the reviewer warned about.
+  **Fix** (`classification/classifier.py` `is_vague`): when nothing done or lost is stated (the `engaged`
+  question is pending), the rule-based red-flag detector finds nothing and no suspect identifier was given,
+  confidence is capped at 0.5 and the reasoning starts "Few details so far, so this is only a possibility."
+  The category is kept so retrieval stays relevant. Reports with any red flag (e.g. "asked for my OTP")
+  keep the model's confidence. Re-scored by replaying the stored real-model classification through the
+  guard (the day's quota was exhausted, so this is not a fresh live run): vishing 0.50, all criteria pass.
+  Tests: `test_vague_report_cannot_get_a_confident_label`, `test_report_with_a_red_flag_keeps_model_confidence`.
 - **Checker corrections made after this run:** in the first scoring pass, A, F, G and I failed "evidence
   destruction" / "asks for an OTP" / "assumed loss". Every hit was either a `do_not` item ("Delete the SMS
   before taking a screenshot", "Share the OTP, PIN…"), which the UI shows under a "Do not" heading, or the
@@ -117,12 +124,12 @@ question first in 5/5 and put the bank step first in 4/4.
 
 ## Not done / residual risk
 
-- **Real-LLM run incomplete**: K and L still need a real run (next day's quota), and E's over-confidence is unresolved.
+- **Real-LLM run incomplete**: K and L still need a real run (next day's quota); E's fix was verified by replay, not a fresh live call.
 - **Expert review** of the scenarios and of the KB summaries' contact details: not done.
 - **Source verification**: no team summary has a `last_verified` date yet; a person must check each against its official page and fill it in. The local official texts (`knowledge_base/official/`, git-ignored) get the date when `python -m scripts.fetch_official_kb` is re-run.
 - **Conflicting sources** are not detected (e.g. two sources giving different numbers); both would pass the scrubber.
 - **Signals are English regexes**: Hindi/Hinglish phrasing of "I shared the OTP" falls back to the generic questions.
-- **Confidence** is still the model's self-report with a 0.35 floor; not calibrated. Self-consistency was not implemented: without real-model runs on ambiguous cases there is no evidence it would help, and it multiplies cost/latency on a free-tier provider.
+- **Confidence** is still the model's self-report (0.35 floor; 0.5 cap for vague reports); not calibrated. The vague-report test is rule-based and English-only. Self-consistency was not implemented: without real-model runs on ambiguous cases there is no evidence it would help, and it multiplies cost/latency on a free-tier provider.
 - **No authentication**: anyone holding a conversation or incident UUID can read or delete it. Do not deploy publicly as-is.
 - **Retention**: records are kept until the user deletes them; there is no automatic expiry.
 - Scrubber can still miss contact details written in words or split oddly, and it removes legitimate numbers that are in neither the sources nor the user's report (e.g. years).

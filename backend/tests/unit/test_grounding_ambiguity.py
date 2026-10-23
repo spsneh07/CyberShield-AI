@@ -160,3 +160,21 @@ def test_exception_tracebacks_are_redacted():
     RedactingFilter().filter(record)
     assert record.exc_info is None and "Traceback" in record.msg
     assert "victim@ybl" not in record.msg and "9876543210" not in record.msg and "I lost money" not in record.msg
+
+
+# -- over-confidence on vague reports ----------------------------------------------------------------
+def test_vague_report_cannot_get_a_confident_label(llm):
+    from app.services.classification.classifier import VAGUE_MAX_CONFIDENCE, IncidentClassifier
+
+    vague, _ = IncidentExtractor(llm).extract("I got a call from someone saying they were from my bank.")
+    llm.queue["classification"].append(json.dumps({"category": "vishing", "confidence": 0.85, "reasoning": "bank call"}))
+    cls = IncidentClassifier(llm).classify(vague)
+    assert cls.category == "vishing" and cls.confidence == VAGUE_MAX_CONFIDENCE and cls.reasoning.startswith("Few details")
+
+
+def test_report_with_a_red_flag_keeps_model_confidence(llm):
+    from app.services.classification.classifier import IncidentClassifier
+
+    clear, _ = IncidentExtractor(llm).extract("Someone called claiming to be from my bank and asked for my OTP.")
+    llm.queue["classification"].append(json.dumps({"category": "vishing", "confidence": 0.85, "reasoning": "OTP request"}))
+    assert IncidentClassifier(llm).classify(clear).confidence == 0.85
