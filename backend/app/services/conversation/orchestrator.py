@@ -11,6 +11,7 @@ from app.schemas.guidance import Citation
 from app.services.ai.base import LLMError, StructuredOutputError
 from app.services.ai.prompts import conversation as prompt
 from app.services.ai.structured import generate_structured
+from app.services.guidance.advisor import known_text, scrub_unsupported
 from app.services.guidance.safety import scrub_reply
 from app.services.incident.extractor import follow_up_questions
 from app.services.language import current_language, set_language
@@ -46,6 +47,9 @@ class Orchestrator:
         emit("analyzing")
         intent = msg.action or self._intent(msg.content, incident is not None, history)
         if intent == "provide_details" and incident is None:
+            intent = "report_incident"
+        # "...for the complaint" in a first, detailed report: analyse it instead of asking them to describe it again.
+        if intent == "generate_complaint" and incident is None and msg.action is None and len(msg.content.split()) >= 12:
             intent = "report_incident"
         stages = ["analyzing"]
 
@@ -102,7 +106,8 @@ class Orchestrator:
 
         if not result.reply:
             track("generating")
-            result.reply = scrub_reply(self._reply(msg.content, result))
+            known = known_text(result.incident) if result.incident else ""
+            result.reply = scrub_unsupported(scrub_reply(self._reply(msg.content, result)), result.sources, known)
 
         track("saving")
         result.stages = stages

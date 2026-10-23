@@ -26,6 +26,7 @@ class Settings(BaseSettings):
 
     rag_top_k: int = 5
     rag_min_score: float = 0.05
+    source_max_age_days: int = 180  # older last_verified dates are shown as "stale"
     knowledge_base_dir: str = str(ROOT_DIR / "knowledge_base")
 
     cors_origins: str = "http://localhost:3000"

@@ -52,6 +52,7 @@ def main() -> int:
                     "verify against the original.")
             meta = {k: src[k] for k in ("title", "organization", "url", "category", "date", "document_type")}
             meta["source_note"] = note
+            meta["last_verified"] = date.today().isoformat()  # fetched from the official URL today
             target = out_dir / src["filename"]
             if src["format"] == "pdf":
                 target.write_bytes(resp.content)

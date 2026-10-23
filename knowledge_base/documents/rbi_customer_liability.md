@@ -4,6 +4,7 @@ organization: Reserve Bank of India
 url: https://www.rbi.org.in
 category: banking_fraud
 date: 2017-07-06
+last_verified:
 document_type: curated_summary
 source_note: Team-written summary of public guidance from the organisation above. Not the official text; verify details at the source URL.
 ---

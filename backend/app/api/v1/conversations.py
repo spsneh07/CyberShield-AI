@@ -43,6 +43,16 @@ def get_conversation(conversation_id: str, db: Session = Depends(get_db)) -> Con
                            incident_id=incident.id if incident else None)
 
 
+@router.delete("/{conversation_id}", status_code=204)
+def delete_conversation(conversation_id: str, db: Session = Depends(get_db)) -> None:
+    """Permanently delete the conversation, its incident record and generated drafts (user-requested erasure)."""
+    repo = ConversationRepository(db)
+    conv = repo.get(conversation_id)
+    if conv is None:
+        raise NotFoundError("Conversation")
+    repo.delete(conv)
+
+
 @router.post("/{conversation_id}/messages", response_model=AssistantResult)
 def post_message(conversation_id: str, body: MessageIn, db: Session = Depends(get_db),
                  pipeline: Pipeline = Depends(get_pipeline)) -> AssistantResult:

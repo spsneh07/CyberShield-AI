@@ -10,6 +10,8 @@ _PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"\b[\w.\-]+@[a-zA-Z]{2,}\b"), "[UPI]"),
     (re.compile(r"(?<!\d)(?:\+?91[\-\s]?)?[6-9]\d{9}(?!\d)"), "[PHONE]"),
     (re.compile(r"\b\d{11,18}\b"), "[NUMBER]"),
+    # Pydantic validation errors echo the offending input, which can be the user's incident text.
+    (re.compile(r"input_value=.*?(?=, input_type=|$)", re.M), "input_value=[REDACTED]"),
 ]
 
 
@@ -21,7 +23,11 @@ def redact(text: str) -> str:
 
 class RedactingFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
-        record.msg = redact(record.getMessage())
+        msg = record.getMessage()
+        if record.exc_info:  # the formatter would append the traceback after this filter, unredacted
+            msg += "\n" + logging.Formatter().formatException(record.exc_info)
+            record.exc_info = record.exc_text = None
+        record.msg = redact(msg)
         record.args = ()
         return True
 

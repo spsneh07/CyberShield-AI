@@ -139,6 +139,7 @@ ingestion, retrieval refuses to run (`embedding_mismatch`) until you re-run inge
 | `EMBEDDING_MODEL`, `EMBEDDING_BASE_URL`, `EMBEDDING_API_KEY` | | |
 | `EMBEDDING_DIM` | 384 | must match the migration's `vector(384)` column |
 | `RAG_TOP_K`, `RAG_MIN_SCORE` | 5, 0.05 | use ~0.25 for semantic embeddings |
+| `SOURCE_MAX_AGE_DAYS` | 180 | sources last verified longer ago are flagged as stale |
 | `INSTALL_ML` | false | Docker build: include sentence-transformers |
 | `CORS_ORIGINS`, `NEXT_PUBLIC_API_URL` | localhost | |
 
@@ -169,6 +170,7 @@ Pytest prints every skipped test and why (`-rs`); skipped tests are not counted 
 ```bash
 python -m evaluation.run_eval --mode real      # configured LLM + embeddings → evaluation/results_real.json
 python -m evaluation.run_eval --mode offline   # mock LLM; pipeline check only
+python -m evaluation.run_scenarios --mode offline   # 12 user-journey scenarios: right next step, no unsafe assumptions
 ```
 
 See [docs/project_explanation.md](docs/project_explanation.md#evaluation) for the method, dataset and the
@@ -193,7 +195,7 @@ source_note`. Ingest everything with `python -m scripts.ingest_kb`. See
 | Method | Path |
 |---|---|
 | POST | `/api/v1/conversations` |
-| GET | `/api/v1/conversations/{id}` |
+| GET · DELETE | `/api/v1/conversations/{id}` (DELETE erases the conversation, incident, drafts and feedback) |
 | POST | `/api/v1/conversations/{id}/messages` (JSON) · `/messages/stream` (SSE) |
 | POST | `/api/v1/incidents/analyze` |
 | GET | `/api/v1/incidents/{id}` |
@@ -224,7 +226,10 @@ Interactive docs at http://localhost:8000/docs. Errors share one shape: `{"error
 - Output guards are rule-based (URL/helpline scrubbing, evidence-deletion filter, complaint-claim
   validator) and can miss paraphrases; the complaint validator is conservative and may also drop true
   statements the user phrased differently. Drafts must be reviewed before submission.
-- No authentication; conversations are anonymous by ID. Do not deploy publicly as-is.
+- No authentication; conversations are anonymous by ID, and anyone with an ID can read or delete it. Do not deploy publicly as-is.
+- Team-written summaries have no `last_verified` date yet and are shown as "not verified"; guidance says so. See
+  [docs/guidance_evaluation.md](docs/guidance_evaluation.md) for the grounding, ambiguity and privacy changes and their evaluation.
+- Follow-up question signals (OTP shared, link clicked, loss stated/denied) are English rules.
 - Complainant details entered for a draft are stored in the draft text.
 - Replies in English or Hindi only. Extraction rules, the mock provider, baseline evidence items and the
   complaint draft are English; Hindi output quality depends on the model and has not been measured.

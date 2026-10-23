@@ -66,6 +66,14 @@ export function GuidancePanel({ guidance, sources }: { guidance: Guidance; sourc
         )}
       </div>
       <SourceRefs ids={guidance.source_ids} sources={sources} />
+      {guidance.verification_notes.length > 0 && (
+        <div className="mt-3 rounded-lg border border-warn/30 bg-warn/5 p-3" role="note">
+          <h3 className="mb-1 text-xs font-semibold text-warn">
+            {guidance.evidence_status === "insufficient" ? "No trusted source found" : "Check before relying on this"}
+          </h3>
+          <List items={guidance.verification_notes} />
+        </div>
+      )}
     </section>
   );
 }
@@ -123,6 +131,9 @@ export function SourcesPanel({ sources }: { sources: Citation[] }) {
                   {s.organization}
                   <span className="chip">{s.document_type.replace("_", " ")}</span>
                   <span className="chip">relevance {s.score.toFixed(2)}</span>
+                  <span className={`chip ${s.freshness === "verified" ? "text-safe" : "text-warn"}`}>
+                    {s.freshness === "unverified" ? "not verified" : `${s.freshness} ${s.last_verified ?? ""}`}
+                  </span>
                 </span>
               </summary>
               <p className="mt-2 whitespace-pre-line text-xs text-slate-300">{s.excerpt}</p>

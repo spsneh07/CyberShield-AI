@@ -45,6 +45,7 @@ class KnowledgeRepository:
         doc.url = meta["url"] or ""
         doc.category = meta["category"] or "general"
         doc.published_date = meta.get("date")
+        doc.last_verified = meta.get("last_verified")
         doc.document_type = meta.get("document_type") or "document"
         doc.source_note = meta.get("source_note")
         doc.embedding_identity = embedding_identity

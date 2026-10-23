@@ -37,6 +37,12 @@ export const getHealth = () =>
 export const createConversation = () =>
   request<{ id: string }>("/api/v1/conversations", { method: "POST", body: JSON.stringify({}) });
 
+/** Permanently deletes the conversation and its incident record on the server (204, no body). */
+export async function deleteConversation(id: string): Promise<void> {
+  const res = await fetch(`${API_URL}/api/v1/conversations/${encodeURIComponent(id)}`, { method: "DELETE" });
+  if (!res.ok && res.status !== 404) throw new ApiError(`Delete failed (${res.status})`, res.status);
+}
+
 export const checkMessage = (text: string, llmExplanations = false, language: Language = "en") =>
   request<RedFlagReport>("/api/v1/check/message", {
     method: "POST", body: JSON.stringify({ text, llm_explanations: llmExplanations, language }),

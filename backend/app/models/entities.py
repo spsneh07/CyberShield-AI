@@ -124,6 +124,7 @@ class KnowledgeDocument(TimestampMixin, Base):
     url: Mapped[str] = mapped_column(String(500))
     category: Mapped[str] = mapped_column(String(60), index=True)
     published_date: Mapped[str | None] = mapped_column(String(40))
+    last_verified: Mapped[str | None] = mapped_column(String(40))  # ISO date the source was last checked
     document_type: Mapped[str] = mapped_column(String(60))
     source_note: Mapped[str | None] = mapped_column(Text)  # provenance, e.g. "team-written summary of ..."
     embedding_identity: Mapped[str | None] = mapped_column(String(200))

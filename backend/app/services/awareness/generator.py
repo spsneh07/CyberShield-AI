@@ -5,6 +5,7 @@ from app.services.ai.base import LLMProvider, StructuredOutputError
 from app.services.ai.prompts import awareness as prompt
 from app.services.ai.structured import generate_structured
 from app.services.classification.taxonomy import label
+from app.services.guidance.advisor import scrub_unsupported
 from app.services.guidance.safety import drop_evidence_destruction
 
 
@@ -19,8 +20,9 @@ class AwarenessGenerator:
                                           user=prompt.build(incident, cls, sources, topic), schema=Awareness)
         except StructuredOutputError:
             content = Awareness(headline=f"Staying safe from {label(cls.category) if cls else 'online scams'}")
-        content.prevention_tips = drop_evidence_destruction(content.prevention_tips)
-        content.future_precautions = drop_evidence_destruction(content.future_precautions)
+        for field in ("warning_signs", "prevention_tips", "future_precautions"):
+            items = [scrub_unsupported(x, sources) for x in getattr(content, field)]
+            setattr(content, field, drop_evidence_destruction(items))
         # Resources must come from retrieved sources — drop any invented link, then fill from sources.
         allowed = {s.url: s for s in sources if s.url}
         resources: list[Resource] = []

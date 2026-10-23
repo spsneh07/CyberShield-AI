@@ -24,7 +24,7 @@ from app.services.ai.prompts import guidance as guidance_prompt
 from app.services.ai.structured import generate_structured
 from app.services.classification.classifier import IncidentClassifier
 from app.services.complaint.generator import ComplaintGenerator
-from app.services.guidance.advisor import _NUMBER, _URL, _source_text
+from app.services.guidance.advisor import _NUMBER, _URL, known_text, scrub_unsupported
 from app.services.guidance.safety import destroys_evidence
 from app.services.incident.extractor import IncidentExtractor
 from app.services.incident.identifiers import extract_identifiers, normalize
@@ -33,19 +33,10 @@ from app.services.rag.retriever import Retriever
 HERE = Path(__file__).parent
 
 
-def unsupported_mentions(text: str, allowed: str) -> list[str]:
-    """URLs and helpline-style short numbers in model output that do not occur in retrieved sources."""
-    bad = []
-    for m in _URL.finditer(text):
-        core = re.sub(r"^https?://(www\.)?", "", m.group(0).lower().rstrip(".,")).split("/")[0]
-        if core not in allowed:
-            bad.append(m.group(0))
-    allowed_nums = set(re.sub(r"[^\d ]", " ", allowed).split())
-    for m in _NUMBER.finditer(text):
-        digits = re.sub(r"\D", "", m.group(0))
-        if 3 <= len(digits) <= 6 and digits not in allowed_nums:
-            bad.append(m.group(0))
-    return bad
+def unsupported_mentions(text: str, sources, known: str = "") -> list[str]:
+    """URLs and phone/helpline-style numbers in text that occur neither in retrieved sources nor in `known`."""
+    found = [m.group(0) for m in _URL.finditer(text)] + [m.group(0) for m in _NUMBER.finditer(text)]
+    return [x for x in found if scrub_unsupported(x, sources, known) != x]
 
 
 def complaint_check(data, body: str) -> dict:
@@ -139,7 +130,7 @@ def main() -> None:
                                           user=guidance_prompt.build(data, cls, sources), schema=Guidance)
                 text = " ".join(raw.immediate_actions + raw.security_steps + raw.reporting_guidance)
                 row["grounding"] = {
-                    "unsupported_mentions": unsupported_mentions(text, _source_text(sources)),
+                    "unsupported_mentions": unsupported_mentions(text, sources, known_text(data)),
                     "invalid_source_ids": [i for i in raw.source_ids if i not in {s.id for s in sources}],
                     "evidence_destruction_advice": [x for x in raw.immediate_actions + raw.security_steps if destroys_evidence(x)],
                 }

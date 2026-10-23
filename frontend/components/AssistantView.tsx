@@ -13,7 +13,7 @@ import { Markdown } from "@/components/Markdown";
 import { QUICK_ACTIONS, QuickActionGrid, type QuickAction } from "@/components/QuickActions";
 import { RedFlagSummary } from "@/components/ScamCheck";
 import { StageProgress } from "@/components/StageProgress";
-import { createConversation, sendMessageStream } from "@/lib/api";
+import { createConversation, deleteConversation, sendMessageStream } from "@/lib/api";
 import { categoryLabel } from "@/lib/labels";
 import type { AssistantResult, ChatMessage, ComplainantDetails, EvidenceFile, Intent } from "@/lib/types";
 
@@ -56,6 +56,21 @@ export function AssistantView() {
     setConversationId(id);
     return id;
   }, [conversationId]);
+
+  const eraseConversation = async () => {
+    if (!conversationId) return;
+    if (!window.confirm("Delete this conversation, its incident record and drafts from the server? Download anything you need first.")) return;
+    try {
+      await deleteConversation(conversationId);
+      setConversationId(null);
+      setMessages([]);
+      setInsights({ sources: [] });
+      setStages([]);
+      setEvidenceFiles([]);
+    } catch {
+      window.alert("Could not delete the conversation. Please try again.");
+    }
+  };
 
   const absorb = (r: AssistantResult) => {
     setInsights((prev) => ({
@@ -193,7 +208,15 @@ export function AssistantView() {
           </div>
           <div className="mt-2 flex flex-wrap items-start justify-between gap-2">
             <p className="max-w-xl text-[11px] text-slate-500">{DISCLAIMER}</p>
-            <LanguageSelect value={language} onChange={setLanguage} />
+            <div className="flex items-center gap-3">
+              {conversationId && (
+                <button type="button" className="text-xs text-slate-400 underline hover:text-danger" disabled={busy}
+                  onClick={() => void eraseConversation()}>
+                  Delete this conversation
+                </button>
+              )}
+              <LanguageSelect value={language} onChange={setLanguage} />
+            </div>
           </div>
         </form>
       </section>

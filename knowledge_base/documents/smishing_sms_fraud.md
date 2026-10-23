@@ -4,6 +4,7 @@ organization: Department of Telecommunications, Government of India (Sanchar Saa
 url: https://sancharsaathi.gov.in
 category: smishing
 date:
+last_verified:
 document_type: curated_summary
 source_note: Team-written summary of public guidance from the organisation above. Not the official text; verify details at the source URL.
 ---

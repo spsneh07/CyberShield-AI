@@ -1,3 +1,5 @@
+from datetime import date
+
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
@@ -10,11 +12,21 @@ from app.services.classification.taxonomy import label
 from app.services.rag.sanitize import safe_attr, strip_injections
 
 
+def freshness(last_verified: str | None, max_age_days: int, today: date | None = None) -> str:
+    """verified / stale from a recorded check date; unverified when none is recorded or it can't be parsed."""
+    try:
+        checked = date.fromisoformat((last_verified or "")[:10])
+    except ValueError:
+        return "unverified"
+    return "verified" if ((today or date.today()) - checked).days <= max_age_days else "stale"
+
+
 class Retriever:
-    def __init__(self, db: Session, embeddings: EmbeddingProvider, top_k: int = 5, min_score: float = 0.05) -> None:
+    def __init__(self, db: Session, embeddings: EmbeddingProvider, top_k: int = 5, min_score: float = 0.05,
+                 max_age_days: int = 180) -> None:
         self.repo = KnowledgeRepository(db)
         self.embeddings = embeddings
-        self.top_k, self.min_score = top_k, min_score
+        self.top_k, self.min_score, self.max_age_days = top_k, min_score, max_age_days
 
     def _check_index_compatible(self) -> None:
         stored = self.repo.embedding_identities()
@@ -52,6 +64,8 @@ class Retriever:
                 category=h.document.category,
                 document_type=h.document.document_type,
                 published_date=h.document.published_date,
+                last_verified=h.document.last_verified,
+                freshness=freshness(h.document.last_verified, self.max_age_days),
                 source_note=h.document.source_note,
                 score=round(h.score, 4),
                 excerpt=excerpt,

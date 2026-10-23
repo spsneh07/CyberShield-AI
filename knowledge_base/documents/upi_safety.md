@@ -4,6 +4,7 @@ organization: National Payments Corporation of India (NPCI)
 url: https://www.npci.org.in
 category: upi_fraud
 date:
+last_verified:
 document_type: curated_summary
 source_note: Team-written summary of public guidance from the organisation above. Not the official text; verify details at the source URL.
 ---

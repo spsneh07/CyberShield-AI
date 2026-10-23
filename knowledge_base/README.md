@@ -13,6 +13,7 @@ organization: ...         # required — the organisation whose guidance this is
 url: https://...          # required, http(s) only — the official page the content is based on
 category: phishing | upi_fraud | ... | general | reporting | evidence   # required
 date: 2017-07-06          # publication date of the underlying guidance if known, otherwise empty
+last_verified: 2026-10-20 # date a person checked the official page still says this; empty = never (shown as "not verified")
 document_type: curated_summary | advisory | circular | faq | official_text   # required
 source_note: ...          # required — plain statement of provenance, shown to users with the citation
 ---

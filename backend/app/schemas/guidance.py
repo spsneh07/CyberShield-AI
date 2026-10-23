@@ -12,6 +12,8 @@ class Citation(BaseModel):
     document_type: str
     published_date: str | None = None
     source_note: str | None = None
+    last_verified: str | None = None  # date someone last checked the source is current; None = never recorded
+    freshness: Literal["verified", "stale", "unverified"] = "unverified"
     score: float
     excerpt: str
 
@@ -38,6 +40,9 @@ class Guidance(BaseModel):
     evidence_checklist: list[EvidenceChecklistItem] = Field(default_factory=list)
     do_not: list[str] = Field(default_factory=list)
     source_ids: list[str] = Field(default_factory=list)
+    # Computed after generation (never by the model): how well the guidance is backed by retrieved sources.
+    evidence_status: Literal["supported", "limited", "insufficient"] = "supported"
+    verification_notes: list[str] = Field(default_factory=list)
 
 
 class Resource(BaseModel):

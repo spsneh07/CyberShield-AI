@@ -97,6 +97,11 @@ PostgreSQL with pgvector is the application database. SQLite is used only by the
 | Citation ids filtered to retrieved ids; awareness links filtered to retrieved URLs; only http(s) links rendered | `guidance`, `awareness`, frontend |
 | Complaint narrative identifiers not provided by the user → placeholders | `complaint/generator.py` |
 | Query embedding model must match the model used to build the index | `rag/retriever.py` |
+| Hosts must match a source host exactly; 3–13 digit numbers must be in a source or the user's report (guidance, explanation, chat reply, awareness) | `guidance/advisor.py` |
+| `evidence_status` + `verification_notes` computed from retrieval and source freshness (`last_verified`) | `guidance/advisor.py`, `rag/retriever.py` |
+| Urgent bank step inserted first when money or credentials may be at risk | `guidance/advisor.py` |
+| Decisive follow-ups (loss conflict, money moved, details entered, engaged); conflicting or uncertain loss stays unknown | `incident/extractor.py` |
+| `<`/`>` JSON-escaped inside `<input>` so user text cannot fake a block | `prompts/common.py` |
 
 ## Tests
 

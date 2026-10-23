@@ -4,6 +4,7 @@ organization: Indian Computer Emergency Response Team (CERT-In), MeitY
 url: https://www.cert-in.org.in
 category: ransomware
 date:
+last_verified:
 document_type: curated_summary
 source_note: Team-written summary of public guidance from the organisation above. Not the official text; verify details at the source URL.
 ---

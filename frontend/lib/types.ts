@@ -48,6 +48,8 @@ export interface Citation {
   document_type: string;
   published_date: string | null;
   source_note: string | null;
+  last_verified: string | null;
+  freshness: "verified" | "stale" | "unverified";
   score: number;
   excerpt: string;
 }
@@ -74,6 +76,8 @@ export interface Guidance {
   evidence_checklist: EvidenceItem[];
   do_not: string[];
   source_ids: string[];
+  evidence_status: "supported" | "limited" | "insufficient";
+  verification_notes: string[];
 }
 
 export interface ComplaintDraft {

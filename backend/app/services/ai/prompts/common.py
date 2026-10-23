@@ -25,7 +25,9 @@ DISCLAIMER = (
 
 
 def input_block(payload: dict[str, Any]) -> str:
-    return f"<input>\n{json.dumps(payload, ensure_ascii=False, default=str)}\n</input>"
+    # Escape angle brackets (still valid JSON) so user text cannot close </input> or open a fake <sources>.
+    data = json.dumps(payload, ensure_ascii=False, default=str).replace("<", "\\u003c").replace(">", "\\u003e")
+    return f"<input>\n{data}\n</input>"
 
 
 def sources_block(sources: list[Citation]) -> str:

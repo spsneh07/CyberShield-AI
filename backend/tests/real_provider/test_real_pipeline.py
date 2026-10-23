@@ -22,7 +22,6 @@ from app.services.incident.identifiers import extract_identifiers
 from app.services.pipeline import Pipeline
 from app.services.rag.ingest import Ingestor
 from evaluation.run_eval import unsupported_mentions
-from app.services.guidance.advisor import _source_text
 from tests.conftest import BACKEND, DEMO, KB_DIR
 
 pytestmark = [
@@ -82,7 +81,7 @@ def test_demo_end_to_end_with_real_llm(real):
     assert data.date_time is None and data.amount is None  # not invented
     assert sources and guidance.immediate_actions and guidance.evidence_checklist
     text = " ".join(guidance.immediate_actions + guidance.security_steps + guidance.reporting_guidance)
-    assert unsupported_mentions(text, _source_text(sources)) == []
+    assert unsupported_mentions(text, sources) == []
     assert not any(destroys_evidence(x) for x in guidance.immediate_actions + guidance.security_steps)
     assert set(guidance.source_ids) <= {s.id for s in sources}
 

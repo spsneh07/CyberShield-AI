@@ -4,6 +4,7 @@ organization: Indian Cyber Crime Coordination Centre (I4C), Ministry of Home Aff
 url: https://cybercrime.gov.in
 category: shopping_fraud
 date:
+last_verified:
 document_type: curated_summary
 source_note: Team-written summary of public guidance from the organisation above. Not the official text; verify details at the source URL.
 ---

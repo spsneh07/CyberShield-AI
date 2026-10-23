@@ -1,9 +1,9 @@
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from app.models import Conversation, Feedback, Message
+from app.models import AwarenessContent, ComplaintDraft, Conversation, Feedback, Incident, Message
 
 
 class ConversationRepository:
@@ -54,3 +54,14 @@ class ConversationRepository:
 
     def get_message(self, message_id: str) -> Message | None:
         return self.db.get(Message, message_id)
+
+    def delete(self, conv: Conversation) -> None:
+        """Delete a conversation and everything derived from it (messages, incidents, drafts, feedback)."""
+        incident_ids = select(Incident.id).where(Incident.conversation_id == conv.id)
+        message_ids = select(Message.id).where(Message.conversation_id == conv.id)
+        # These tables rely on DB-level ON DELETE CASCADE, which SQLite does not enforce by default.
+        self.db.execute(delete(ComplaintDraft).where(ComplaintDraft.incident_id.in_(incident_ids)))
+        self.db.execute(delete(AwarenessContent).where(AwarenessContent.incident_id.in_(incident_ids)))
+        self.db.execute(delete(Feedback).where(Feedback.message_id.in_(message_ids)))
+        self.db.delete(conv)
+        self.db.commit()

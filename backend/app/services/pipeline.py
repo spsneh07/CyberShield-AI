@@ -32,7 +32,7 @@ class Pipeline:
         self.incidents = IncidentRepository(db)
         self.extractor = IncidentExtractor(llm)
         self.classifier = IncidentClassifier(llm)
-        self.retriever = Retriever(db, embeddings, settings.rag_top_k, settings.rag_min_score)
+        self.retriever = Retriever(db, embeddings, settings.rag_top_k, settings.rag_min_score, settings.source_max_age_days)
         self.advisor = Advisor(llm)
         self.complaints = ComplaintGenerator(llm)
         self.awareness_gen = AwarenessGenerator(llm)
