@@ -161,6 +161,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode", choices=["offline", "real"], required=True)
     parser.add_argument("--out", default=None)
+    parser.add_argument("--ids", default="", help="comma-separated scenario ids to run, e.g. K,L (default: all)")
     args = parser.parse_args()
 
     from alembic import command
@@ -179,6 +180,8 @@ def main() -> None:
         raise SystemExit("--mode real needs LLM_PROVIDER=openai|anthropic in .env")
     llm, emb = build_llm(settings), build_embeddings(settings)
     scenarios = [json.loads(x) for x in (HERE / "scenarios.jsonl").read_text(encoding="utf-8").splitlines() if x.strip()]
+    if args.ids:
+        scenarios = [s for s in scenarios if s["id"] in args.ids.split(",")]
     with SessionLocal() as db:
         if args.mode == "offline":
             backend = HERE.parent
