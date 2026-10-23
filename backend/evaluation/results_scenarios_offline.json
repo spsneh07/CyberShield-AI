@@ -1,7 +1,7 @@
 {
   "summary": {
     "mode": "offline",
-    "run_at": "2026-10-23T08:10:13.422873+00:00",
+    "run_at": "2026-10-23T08:39:25.356523+00:00",
     "llm": "mock-heuristic (not a model)",
     "embeddings": "hash::384",
     "criteria_definitions": {
@@ -32,6 +32,7 @@
       "urgent_bank_step_first": "6/6"
     },
     "failures": {},
+    "incomplete": [],
     "note": "12 hand-written scenarios; indicates behaviour, not real-world accuracy. No domain-expert review yet."
   },
   "rows": [
