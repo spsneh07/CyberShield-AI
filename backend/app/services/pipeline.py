@@ -39,7 +39,7 @@ class Pipeline:
 
     # -- analysis ---------------------------------------------------------------------------
     def analyze(self, message: str, conversation_id: str | None = None, existing: Incident | None = None,
-                emit: StageCallback = _noop) -> dict:
+                user_id: str | None = None, emit: StageCallback = _noop) -> dict:
         previous = self.incidents.to_data(existing) if existing else None
         emit("extracting")
         data, warnings = self.extractor.extract(message, previous)
@@ -52,7 +52,7 @@ class Pipeline:
         explanation = self.advisor.explain(data, cls, sources)
         guidance = self.advisor.guide(data, cls, sources)
         emit("saving")
-        incident = self.incidents.save(data, conversation_id, existing)
+        incident = self.incidents.save(data, conversation_id, existing, user_id=user_id)
         self.incidents.add_classification(incident, cls, self.llm.name)
         self.incidents.replace_evidence(incident, guidance.evidence_checklist)
         return {"incident": incident, "data": data, "classification": cls, "sources": sources,

@@ -26,12 +26,13 @@ class User(TimestampMixin, Base):
     __tablename__ = "users"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
     display_name: Mapped[str | None] = mapped_column(String(120))
+    token_hash: Mapped[str | None] = mapped_column(String(64), index=True)
 
 
 class Conversation(TimestampMixin, Base):
     __tablename__ = "conversations"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
-    user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), index=True)
     title: Mapped[str] = mapped_column(String(200), default="New conversation")
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
     messages: Mapped[list["Message"]] = relationship(
@@ -57,6 +58,7 @@ class Incident(TimestampMixin, Base):
     conversation_id: Mapped[str | None] = mapped_column(
         ForeignKey("conversations.id", ondelete="CASCADE"), index=True
     )
+    user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), index=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
     incident_type: Mapped[str | None] = mapped_column(String(60))
     subtype: Mapped[str | None] = mapped_column(String(120))

@@ -5,6 +5,40 @@ import type {
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
+const SESSION_TOKEN_KEY = "cyber_assist_session_token";
+
+export function getSessionToken(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return localStorage.getItem(SESSION_TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setSessionToken(token: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(SESSION_TOKEN_KEY, token);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function clearSessionToken(): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem(SESSION_TOKEN_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function getAuthHeaders(): Record<string, string> {
+  const token = getSessionToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 export class ApiError extends Error {
   constructor(message: string, public status: number) {
     super(message);
@@ -12,9 +46,14 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers = {
+    "Content-Type": "application/json",
+    ...getAuthHeaders(),
+    ...(init?.headers ?? {}),
+  };
   const res = await fetch(`${API_URL}${path}`, {
     ...init,
-    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+    headers,
   });
   if (!res.ok) {
     let message = `Request failed (${res.status})`;
@@ -34,12 +73,23 @@ export const getMeta = () => request<Meta>("/api/v1/meta");
 export const getHealth = () =>
   request<{ status: string; llm_provider: string; embedding_provider: string; knowledge_chunks: number }>("/health");
 
-export const createConversation = () =>
-  request<{ id: string }>("/api/v1/conversations", { method: "POST", body: JSON.stringify({}) });
+export const createConversation = async () => {
+  const res = await request<{ id: string; session_token?: string | null }>("/api/v1/conversations", {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+  if (res.session_token) {
+    setSessionToken(res.session_token);
+  }
+  return res;
+};
 
 /** Permanently deletes the conversation and its incident record on the server (204, no body). */
 export async function deleteConversation(id: string): Promise<void> {
-  const res = await fetch(`${API_URL}/api/v1/conversations/${encodeURIComponent(id)}`, { method: "DELETE" });
+  const res = await fetch(`${API_URL}/api/v1/conversations/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    headers: getAuthHeaders(),
+  });
   if (!res.ok && res.status !== 404) throw new ApiError(`Delete failed (${res.status})`, res.status);
 }
 
@@ -74,7 +124,7 @@ export async function sendMessageStream(
 ): Promise<AssistantResult> {
   const res = await fetch(`${API_URL}/api/v1/conversations/${conversationId}/messages/stream`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
     body: JSON.stringify({ content, action, complainant, language, evidence_files: evidenceFiles }),
     signal,
   });

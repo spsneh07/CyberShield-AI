@@ -1,7 +1,7 @@
 {
   "summary": {
     "mode": "offline",
-    "run_at": "2026-10-23T08:41:33.865641+00:00",
+    "run_at": "2026-11-02T14:08:14.273878+00:00",
     "llm": "mock-heuristic (not a model)",
     "embeddings": "hash::384",
     "criteria_definitions": {
@@ -33,7 +33,7 @@
     },
     "failures": {},
     "incomplete": [],
-    "note": "12 hand-written scenarios; indicates behaviour, not real-world accuracy. No domain-expert review yet."
+    "note": "12 scenarios from scenarios.jsonl; indicates behaviour, not real-world accuracy. No domain-expert review yet."
   },
   "rows": [
     {
@@ -116,8 +116,8 @@
         "urgent_bank_step_first": true,
         "category_acceptable": true
       },
-      "category": "upi_fraud",
-      "confidence": 0.5,
+      "category": "banking_fraud",
+      "confidence": 0.6,
       "follow_up_questions": [
         "Where were you contacted — WhatsApp, SMS, phone call, email, a website or an app?",
         "Do you have the transaction ID / UTR number of the payment?",
@@ -231,8 +231,8 @@
         "loss_state_correct": true,
         "urgent_bank_step_first": true
       },
-      "category": "vishing",
-      "confidence": 0.5,
+      "category": "banking_fraud",
+      "confidence": 0.6,
       "follow_up_questions": [
         "When did this happen (date and approximate time)?",
         "Where were you contacted — WhatsApp, SMS, phone call, email, a website or an app?",
@@ -351,7 +351,8 @@
       ],
       "immediate_actions": [
         "Contact your bank or payment app now, using only the number printed on your card, passbook or the bank's official app, and ask them to block further transactions.",
-        "Stop all communication with the suspected fraudster and do not send money to 'recover' losses."
+        "Stop all communication with the suspected fraudster and do not send money to 'recover' losses.",
+        "Uninstall the suspicious remote-access app (e.g. AnyDesk, TeamViewer) immediately and change your passwords from a secure device."
       ],
       "evidence_status": "supported",
       "verification_notes": [
@@ -375,13 +376,13 @@
       "category": "upi_fraud",
       "confidence": 0.6,
       "follow_up_questions": [
-        "Where were you contacted — WhatsApp, SMS, phone call, email, a website or an app?",
-        "Do you have the transaction ID / UTR number of the payment?",
-        "Do you have the phone number, profile, UPI ID, email or link the suspect used?"
+        "आपसे कहाँ संपर्क किया गया था — व्हाट्सएप, एसएमएस, फोन कॉल, ईमेल, वेबसाइट या कोई ऐप?",
+        "क्या आपके पास भुगतान का ट्रांजैक्शन आईडी / यूटीआर (UTR) नंबर है?",
+        "क्या आपके पास संदिग्ध का फोन नंबर, प्रोफाइल, यूपीआई आईडी, ईमेल या लिंक है?"
       ],
       "immediate_actions": [
-        "Contact your bank immediately using the number on your card or the official app and ask them to block the card/account and dispute the transaction.",
-        "Stop all communication with the suspected fraudster and do not send money to 'recover' losses."
+        "तुरंत अपने बैंक या भुगतान ऐप (UPI/वॉलेट) से संपर्क करें और खाते/कार्ड/UPI को ब्लॉक कराएं ताकि आगे नुकसान न हो।",
+        "जालसाज से तुरंत संपर्क बंद करें और पैसे वापस दिलाने के नाम पर किसी को कोई भुगतान न करें।"
       ],
       "evidence_status": "supported",
       "verification_notes": [

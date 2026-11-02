@@ -14,8 +14,10 @@ from alembic import command  # noqa: E402
 from alembic.config import Config  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
+from app.core.auth import generate_session_token, hash_token  # noqa: E402
 from app.core.config import get_settings  # noqa: E402
 from app.core.db import SessionLocal  # noqa: E402
+from app.repositories.users import UserRepository  # noqa: E402
 from app.services.ai.factory import get_embeddings, get_llm  # noqa: E402
 from app.services.ai.providers.hash_embeddings import HashEmbeddings  # noqa: E402
 from app.services.ai.providers.mock import MockLLM  # noqa: E402
@@ -35,6 +37,14 @@ def migrated_db() -> None:
         Ingestor(db, HashEmbeddings(384)).ingest_dir(KB_DIR)
 
 
+@pytest.fixture(autouse=True)
+def reset_response_language():
+    from app.services.language import set_language
+    set_language("en")
+    yield
+    set_language("en")
+
+
 @pytest.fixture
 def db():
     with SessionLocal() as session:
@@ -52,13 +62,47 @@ def pipeline(db, llm) -> Pipeline:
 
 
 @pytest.fixture
-def client(llm):
+def client(llm, db):
+    from app.main import app
+
+    app.dependency_overrides[get_llm] = lambda: llm
+    app.dependency_overrides[get_embeddings] = lambda: HashEmbeddings(384)
+    raw_token = generate_session_token()
+    user = UserRepository(db).create_with_token(token_hash=hash_token(raw_token), display_name="Test User")
+    with TestClient(app, headers={"Authorization": f"Bearer {raw_token}"}) as c:
+        c.user = user
+        c.token = raw_token
+        yield c
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def unauthenticated_client(llm):
     from app.main import app
 
     app.dependency_overrides[get_llm] = lambda: llm
     app.dependency_overrides[get_embeddings] = lambda: HashEmbeddings(384)
     with TestClient(app) as c:
         yield c
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def create_user_client(llm, db):
+    from app.main import app
+
+    app.dependency_overrides[get_llm] = lambda: llm
+    app.dependency_overrides[get_embeddings] = lambda: HashEmbeddings(384)
+
+    def _factory(name: str = "Other User"):
+        raw_token = generate_session_token()
+        user = UserRepository(db).create_with_token(token_hash=hash_token(raw_token), display_name=name)
+        c = TestClient(app, headers={"Authorization": f"Bearer {raw_token}"})
+        c.user = user
+        c.token = raw_token
+        return c
+
+    yield _factory
     app.dependency_overrides.clear()
 
 

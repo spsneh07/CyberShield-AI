@@ -15,10 +15,15 @@ ACCOUNT_RE = re.compile(
     re.IGNORECASE,
 )
 AMOUNT_RE = re.compile(
-    r"(?:₹|rs\.?|inr|rupees?)\s*(\d+(?:,\d+)*(?:\.\d+)?)\s*(lakh|lakhs|crore|k)?|(\d+(?:,\d+)*(?:\.\d+)?)\s*(lakh|lakhs|crore|k)?\s*(?:₹|rs\.?|inr|rupees?)\b|\$\s*(\d+(?:,\d+)*(?:\.\d+)?)",
+    r"(?:₹|rs\.?|inr|rupees?|रुपये|रुपए|रु\.?|rupaye?|rupaiye?|paisa|paise)\s*(\d+(?:,\d+)*(?:\.\d+)?)\s*(lakh|lakhs|crore|k|hazar|hazaar|लाख|करोड़|हजार|हज़ार)?|"
+    r"(\d+(?:,\d+)*(?:\.\d+)?)\s*(lakh|lakhs|crore|k|hazar|hazaar|लाख|करोड़|हजार|हज़ार)?\s*(?:₹|rs\.?|inr|rupees?|रुपये|रुपए|रु\.?|rupaye?|rupaiye?|paisa|paise)\b|"
+    r"\$\s*(\d+(?:,\d+)*(?:\.\d+)?)",
     re.IGNORECASE,
 )
-_MULT = {"lakh": 1e5, "lakhs": 1e5, "crore": 1e7, "k": 1e3}
+_MULT = {
+    "lakh": 1e5, "lakhs": 1e5, "crore": 1e7, "k": 1e3, "लाख": 1e5, "करोड़": 1e7,
+    "hazar": 1e3, "hazaar": 1e3, "हजार": 1e3, "हज़ार": 1e3,
+}
 
 
 @dataclass

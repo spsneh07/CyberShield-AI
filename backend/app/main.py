@@ -18,7 +18,10 @@ setup_logging(settings.log_level)
 
 app = FastAPI(title="AI Cyber Crime Complaint & Awareness Assistant", version="1.0.0")
 app.add_middleware(
-    CORSMiddleware, allow_origins=settings.cors_origin_list, allow_methods=["GET", "POST"], allow_headers=["Content-Type"],
+    CORSMiddleware,
+    allow_origins=settings.cors_origin_list,
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "X-Session-Token"],
 )
 register_error_handlers(app)
 

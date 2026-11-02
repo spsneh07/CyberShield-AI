@@ -5,7 +5,7 @@ import type { ComplaintDraft } from "@/lib/types";
 
 export function ComplaintEditor({ draft }: { draft: ComplaintDraft }) {
   const [body, setBody] = useState(draft.body);
-  const [copied, setCopied] = useState(false);
+  const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "failed">("idle");
   useEffect(() => {
     setBody(draft.body);
   }, [draft.body]);
@@ -13,9 +13,22 @@ export function ComplaintEditor({ draft }: { draft: ComplaintDraft }) {
   const remaining = useMemo(() => Array.from(new Set(body.match(/\[[A-Z][A-Z0-9 /'’&,.-]{1,80}\]/g) ?? [])), [body]);
 
   const copy = async () => {
-    await navigator.clipboard.writeText(body);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    try {
+      if (!navigator.clipboard?.writeText) {
+        throw new Error("Clipboard API unavailable");
+      }
+      await navigator.clipboard.writeText(body);
+      setCopyStatus("copied");
+      setTimeout(() => setCopyStatus("idle"), 1500);
+    } catch {
+      const textarea = document.getElementById("complaint-body") as HTMLTextAreaElement | null;
+      if (textarea) {
+        textarea.focus();
+        textarea.select();
+      }
+      setCopyStatus("failed");
+      setTimeout(() => setCopyStatus("idle"), 3000);
+    }
   };
   const download = () => {
     const url = URL.createObjectURL(new Blob([body], { type: "text/plain" }));
@@ -29,7 +42,19 @@ export function ComplaintEditor({ draft }: { draft: ComplaintDraft }) {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 id="cmp-title" className="panel-title">Complaint draft</h2>
         <div className="flex gap-2">
-          <button type="button" className="btn-ghost px-2.5 py-1.5 text-xs" onClick={copy}>{copied ? "Copied ✓" : "Copy"}</button>
+          <button
+            type="button"
+            className={`btn-ghost px-2.5 py-1.5 text-xs ${
+              copyStatus === "copied" ? "text-safe" : copyStatus === "failed" ? "text-warn" : ""
+            }`}
+            onClick={() => void copy()}
+          >
+            {copyStatus === "copied"
+              ? "Copied ✓"
+              : copyStatus === "failed"
+                ? "Copy failed — text selected, press Ctrl+C"
+                : "Copy"}
+          </button>
           <button type="button" className="btn-ghost px-2.5 py-1.5 text-xs" onClick={download}>Download .txt</button>
         </div>
       </div>

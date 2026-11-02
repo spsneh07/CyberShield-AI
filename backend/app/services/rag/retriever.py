@@ -13,12 +13,16 @@ from app.services.rag.sanitize import safe_attr, strip_injections
 
 
 def freshness(last_verified: str | None, max_age_days: int, today: date | None = None) -> str:
-    """verified / stale from a recorded check date; unverified when none is recorded or it can't be parsed."""
+    """verified / stale from a recorded check date; unverified when none is recorded, in future, or can't be parsed."""
     try:
         checked = date.fromisoformat((last_verified or "")[:10])
     except ValueError:
         return "unverified"
-    return "verified" if ((today or date.today()) - checked).days <= max_age_days else "stale"
+    current_date = today or date.today()
+    age_days = (current_date - checked).days
+    if age_days < 0:
+        return "unverified"  # Future dates are invalid
+    return "verified" if age_days <= max_age_days else "stale"
 
 
 class Retriever:

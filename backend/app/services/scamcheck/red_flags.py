@@ -68,14 +68,15 @@ RULES: list[Rule] = [
        "Asks you to pay or transfer money. Asking for an upfront fee or payment to 'receive' something is a classic scam pattern."),
     _r("impersonation",
        r"\b(?:this is|i am|we are|calling from|message from|from)\s+(?:the\s+|your\s+)?(?:bank|sbi|hdfc|icici|axis|rbi|police|cyber ?cell|cbi|customs|income tax|trai|uidai|courier|fedex|dhl|customer care|kyc department|electricity (?:board|department))\b"
-       r"|\bdear (?:customer|user|account holder)\b|\b(?:bank|kyc|account) (?:officer|executive|department|team)\b",
+       r"|\bdear (?:customer|user|account holder)\b|\b(?:bank|kyc|account) (?:officer|executive|department|team)\b"
+       r"|\b(?:bank|police|courier|fedex|trai|cbi|customs|electricity|bijli)\s*(?:wale|se)\s*(?:bol|call)\b|बैंक से बोल",
        "Claims to be from a bank, agency or company. Anyone can type this; verify only through the organisation's official number or website."),
     _r("personal_info_request",
        r"\b(?:share|send|provide|update|verify|confirm|enter)\b[^.\n]{0,30}\b(?:aadhaar|aadhar|pan(?: card)?|card (?:number|details)|account (?:number|details)|date of birth|bank details|kyc details|debit card|credit card|net ?banking)\b"
        r"|\b(?:update|complete) (?:your )?kyc\b|केवाईसी",
        "Requests personal or banking details. Legitimate services don't collect these over SMS, WhatsApp or unknown links."),
     _r("remote_access",
-       r"\b(?:anydesk|teamviewer|quick ?support|rustdesk|airdroid)\b|\b(?:download|install)\b[^.\n]{0,25}\b(?:app|apk|application|software)\b|\.apk\b|screen ?shar(?:e|ing)",
+       r"\b(?:anydesk|teamviewer|quick ?support|rustdesk|airdroid)\b|\b(?:download|install|daalo|download\s*karo|install\s*karwaya|screen\s*share)\b[^.\n]{0,25}\b(?:app|apk|application|software)\b|\.apk\b|screen ?shar(?:e|ing)|स्क्रीन\s*शेयर",
        "Asks you to install an app or share your screen. This can give someone control of your phone or bank account."),
     _r("too_good_to_be_true",
        r"\b(?:congratulations|you (?:have )?won|lottery|lucky draw|prize|cash ?back of|free gift|guaranteed (?:returns?|profit)|double your money|earn ₹?\s?\d[\d,]* (?:per|a) day|work from home)\b"

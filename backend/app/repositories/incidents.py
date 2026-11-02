@@ -23,8 +23,16 @@ class IncidentRepository:
         )
         return self.db.scalars(stmt).first()
 
-    def save(self, data: IncidentData, conversation_id: str | None = None, incident: Incident | None = None) -> Incident:
-        incident = incident or Incident(conversation_id=conversation_id)
+    def save(
+        self,
+        data: IncidentData,
+        conversation_id: str | None = None,
+        incident: Incident | None = None,
+        user_id: str | None = None,
+    ) -> Incident:
+        incident = incident or Incident(conversation_id=conversation_id, user_id=user_id)
+        if user_id and incident.user_id is None:
+            incident.user_id = user_id
         incident.incident_type = data.incident_type
         incident.subtype = data.subtype
         incident.description = data.description
@@ -68,10 +76,10 @@ class IncidentRepository:
         )
 
     def replace_evidence(self, incident: Incident, items: list[EvidenceChecklistItem]) -> None:
-        for old in list(incident.evidence_items):
-            self.db.delete(old)
-        for it in items:
-            self.db.add(EvidenceItem(incident_id=incident.id, **it.model_dump()))
+        incident.evidence_items = [
+            EvidenceItem(incident_id=incident.id, **it.model_dump())
+            for it in items
+        ]
         self.db.commit()
 
     def add_complaint(self, incident: Incident, subject: str, body: str, placeholders: list[str]) -> ComplaintDraft:

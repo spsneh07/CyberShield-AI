@@ -13,7 +13,7 @@ import { Markdown } from "@/components/Markdown";
 import { QUICK_ACTIONS, QuickActionGrid, type QuickAction } from "@/components/QuickActions";
 import { RedFlagSummary } from "@/components/ScamCheck";
 import { StageProgress } from "@/components/StageProgress";
-import { createConversation, deleteConversation, sendMessageStream } from "@/lib/api";
+import { clearSessionToken, createConversation, deleteConversation, sendMessageStream } from "@/lib/api";
 import { categoryLabel } from "@/lib/labels";
 import type { AssistantResult, ChatMessage, ComplainantDetails, EvidenceFile, Intent } from "@/lib/types";
 
@@ -56,6 +56,22 @@ export function AssistantView() {
     setConversationId(id);
     return id;
   }, [conversationId]);
+
+  const resetSession = () => {
+    if (!window.confirm("Start a new session? This will clear your current local session credentials and reset the chat view. Your existing conversations on the server will not be deleted.")) {
+      return;
+    }
+    clearSessionToken();
+    setConversationId(null);
+    setMessages([]);
+    setInsights({ sources: [] });
+    setStages([]);
+    setEvidenceFiles([]);
+    setInput("");
+    setPendingAction(undefined);
+    setComplainant({});
+    setTab("analysis");
+  };
 
   const eraseConversation = async () => {
     if (!conversationId) return;
@@ -150,7 +166,9 @@ export function AssistantView() {
     <div className="mx-auto grid max-w-7xl gap-4 px-4 py-4 lg:h-[calc(100vh-110px)] lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]">
       {/* Chat column */}
       <section className="flex min-h-[70vh] flex-col lg:min-h-0" aria-label="Conversation">
-        <div className="mb-3"><QuickActionGrid compact onPick={pick} disabled={busy} /></div>
+        <div className="mb-3">
+          <QuickActionGrid compact onPick={pick} disabled={busy} />
+        </div>
 
         <div className="panel flex-1 space-y-4 overflow-y-auto p-4" aria-live="polite">
           {messages.length === 0 && (
@@ -206,16 +224,32 @@ export function AssistantView() {
             />
             <button type="submit" className="btn-primary" disabled={busy || !input.trim()}>{busy ? "Working…" : "Send"}</button>
           </div>
-          <div className="mt-2 flex flex-wrap items-start justify-between gap-2">
-            <p className="max-w-xl text-[11px] text-slate-500">{DISCLAIMER}</p>
-            <div className="flex items-center gap-3">
-              {conversationId && (
-                <button type="button" className="text-xs text-slate-400 underline hover:text-danger" disabled={busy}
-                  onClick={() => void eraseConversation()}>
-                  Delete this conversation
+          <div className="mt-2 space-y-2">
+            <p className="text-[11px] leading-normal text-slate-500">{DISCLAIMER}</p>
+            <div className="flex flex-wrap items-center justify-between gap-2.5 pt-0.5">
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  className="text-xs text-slate-400 underline hover:text-signal"
+                  disabled={busy}
+                  onClick={resetSession}
+                >
+                  Reset session
                 </button>
-              )}
-              <LanguageSelect value={language} onChange={setLanguage} />
+                {conversationId && (
+                  <button
+                    type="button"
+                    className="text-xs text-slate-400 underline hover:text-danger"
+                    disabled={busy}
+                    onClick={() => void eraseConversation()}
+                  >
+                    Delete this conversation
+                  </button>
+                )}
+              </div>
+              <div className="shrink-0">
+                <LanguageSelect value={language} onChange={setLanguage} />
+              </div>
             </div>
           </div>
         </form>
@@ -258,9 +292,23 @@ export function AssistantView() {
 
           {tab === "complaint" && (
             <>
-              <details className="panel p-4">
-                <summary className="cursor-pointer text-sm text-white">Your details for the complaint (optional)</summary>
-                <p className="mt-1 text-xs text-slate-400">Only used to fill the draft. Leave blank to keep placeholders.</p>
+              <details className="panel group p-4">
+                <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-medium text-white select-none [&::-webkit-details-marker]:hidden">
+                  <span>Your details for the complaint (optional)</span>
+                  <svg
+                    aria-hidden="true"
+                    className="h-4 w-4 text-slate-400 transition-transform duration-200 group-open:rotate-180"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </summary>
+                <p className="mt-2 text-xs leading-relaxed text-slate-400">
+                  Enter your details below to automatically populate the formal complaint draft. If left blank, standard placeholder brackets (e.g., [Complainant Name]) will remain for manual editing.
+                </p>
                 <div className="mt-3 grid gap-2 sm:grid-cols-3">
                   {(["name", "contact", "address"] as const).map((f) => (
                     <label key={f} className="text-xs capitalize text-slate-400">{f}

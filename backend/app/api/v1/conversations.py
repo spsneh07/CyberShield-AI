@@ -8,10 +8,13 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_pipeline
+from app.api.deps import (
+    get_authorized_conversation, get_current_user, get_optional_user, get_pipeline,
+)
 from app.core.config import get_settings
 from app.core.db import SessionLocal, get_db
-from app.core.errors import NotFoundError
+from app.core.errors import ForbiddenError, NotFoundError
+from app.models.entities import Conversation, User
 from app.repositories.conversations import ConversationRepository
 from app.repositories.incidents import IncidentRepository
 from app.schemas.conversation import (
@@ -26,17 +29,23 @@ log = logging.getLogger(__name__)
 
 
 @router.post("", response_model=ConversationOut, status_code=201)
-def create_conversation(body: ConversationCreate | None = None, db: Session = Depends(get_db)) -> ConversationOut:
-    conv = ConversationRepository(db).create(body.title if body else None)
-    return ConversationOut(id=conv.id, title=conv.title, created_at=conv.created_at)
+def create_conversation(
+    body: ConversationCreate | None = None,
+    db: Session = Depends(get_db),
+    user_and_token: tuple[User, str | None] = Depends(get_optional_user),
+) -> ConversationOut:
+    user, session_token = user_and_token
+    conv = ConversationRepository(db).create(body.title if body else None, user_id=user.id)
+    return ConversationOut(id=conv.id, title=conv.title, created_at=conv.created_at, session_token=session_token)
 
 
 @router.get("/{conversation_id}", response_model=ConversationOut)
-def get_conversation(conversation_id: str, db: Session = Depends(get_db)) -> ConversationOut:
+def get_conversation(
+    conversation_id: str,
+    conv: Conversation = Depends(get_authorized_conversation),
+    db: Session = Depends(get_db),
+) -> ConversationOut:
     repo = ConversationRepository(db)
-    conv = repo.get(conversation_id)
-    if conv is None:
-        raise NotFoundError("Conversation")
     incident = IncidentRepository(db).latest_for_conversation(conversation_id)
     messages = [MessageOut.model_validate(m, from_attributes=True) for m in repo.list_messages(conversation_id, 200)]
     return ConversationOut(id=conv.id, title=conv.title, created_at=conv.created_at, messages=messages,
@@ -44,18 +53,23 @@ def get_conversation(conversation_id: str, db: Session = Depends(get_db)) -> Con
 
 
 @router.delete("/{conversation_id}", status_code=204)
-def delete_conversation(conversation_id: str, db: Session = Depends(get_db)) -> None:
+def delete_conversation(
+    conversation_id: str,
+    conv: Conversation = Depends(get_authorized_conversation),
+    db: Session = Depends(get_db),
+) -> None:
     """Permanently delete the conversation, its incident record and generated drafts (user-requested erasure)."""
-    repo = ConversationRepository(db)
-    conv = repo.get(conversation_id)
-    if conv is None:
-        raise NotFoundError("Conversation")
-    repo.delete(conv)
+    ConversationRepository(db).delete(conv)
 
 
 @router.post("/{conversation_id}/messages", response_model=AssistantResult)
-def post_message(conversation_id: str, body: MessageIn, db: Session = Depends(get_db),
-                 pipeline: Pipeline = Depends(get_pipeline)) -> AssistantResult:
+def post_message(
+    conversation_id: str,
+    body: MessageIn,
+    conv: Conversation = Depends(get_authorized_conversation),
+    db: Session = Depends(get_db),
+    pipeline: Pipeline = Depends(get_pipeline),
+) -> AssistantResult:
     return Orchestrator(db, pipeline).handle(conversation_id, body)
 
 
@@ -64,10 +78,13 @@ def _sse(event: str, data: object) -> str:
 
 
 @router.post("/{conversation_id}/messages/stream")
-def stream_message(conversation_id: str, body: MessageIn, db: Session = Depends(get_db)) -> StreamingResponse:
+def stream_message(
+    conversation_id: str,
+    body: MessageIn,
+    conv: Conversation = Depends(get_authorized_conversation),
+    db: Session = Depends(get_db),
+) -> StreamingResponse:
     """Server-Sent Events: one `stage` event as each pipeline step starts, then `result` or `error`."""
-    if ConversationRepository(db).get(conversation_id) is None:
-        raise NotFoundError("Conversation")
     events: queue.Queue[tuple[str, object] | None] = queue.Queue()
 
     def worker() -> None:
@@ -97,9 +114,17 @@ feedback_router = APIRouter(tags=["feedback"])
 
 
 @feedback_router.post("/feedback", status_code=201)
-def post_feedback(body: FeedbackIn, db: Session = Depends(get_db)) -> dict:
+def post_feedback(
+    body: FeedbackIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
     repo = ConversationRepository(db)
-    if repo.get_message(body.message_id) is None:
+    msg = repo.get_message(body.message_id)
+    if msg is None:
         raise NotFoundError("Message")
+    conv = repo.get(msg.conversation_id)
+    if conv is None or conv.user_id != current_user.id:
+        raise ForbiddenError("You do not have permission to leave feedback on this message")
     fb = repo.add_feedback(body.message_id, body.rating, body.comment)
     return {"id": fb.id}

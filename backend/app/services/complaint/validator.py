@@ -10,14 +10,22 @@ import re
 from app.schemas.incident import IncidentData
 from app.services.incident.identifiers import AMOUNT_RE, extract_identifiers
 
-_NEG = re.compile(r"\b(not|no|never|none|nothing)\b|n't\b", re.I)
+_WB = r"(?<![a-zA-Z0-9\u0901-\u0963\u0966-\u096f\u0971-\u097f])"
+_WE = r"(?![a-zA-Z0-9\u0901-\u0963\u0966-\u096f\u0971-\u097f])"
+_NEG = re.compile(rf"{_WB}(?:not|no|never|none|nothing|nahi|nahin|mat|bina|नहीं|नही|ना|न|बिना){_WE}|n't\b", re.I)
 
-# Statements about what the complainant did / did not do after the incident.
+# Statements about what the complainant did / did not do after the incident (first-person or third-person).
+_SUBJECT = r"(?:the complainant|complainant|the victim|victim|the user|user|i|we|he|she|they)"
+_ACTION_VERBS = (
+    r"(?:reported|report|informing|informed|inform|contacted|contact|called|call|"
+    r"approached|approach|filed|file|lodged|lodge|complained|complain|notified|notify|"
+    r"visited|visit|blocked|block|froze|frozen|freeze|changed|change|taken|take|done|do)"
+)
 _ACTION_CLAIM = re.compile(
-    r"\b(no (further |other |additional )?(action|steps?|complaint)s?"
-    r"|(not|n't|never) (yet )?(taken|take|reported|report|informed|inform|contacted|contact|approached|filed|file|lodged|done|notified|complained)"
-    r"|(have|has|had) (already |also )?(reported|informed|contacted|called|approached|filed|blocked|lodged|complained|notified|visited|frozen|changed)"
-    r"|(i|we) (already |also |immediately |then )?(reported|informed|contacted|called|approached|filed|blocked|lodged|complained|notified|visited|froze|changed))\b",
+    rf"\b(no (further |other |additional )?(action|steps?|complaint)s?"
+    rf"|(not|n't|never) (yet )?{_ACTION_VERBS}"
+    rf"|(have|has|had) (already |also |immediately |promptly |then )?{_ACTION_VERBS}"
+    rf"|{_SUBJECT} (already |also |immediately |promptly |then |subsequently |later |thereafter )?(?:has |have |had )?{_ACTION_VERBS})\b",
     re.I,
 )
 # Statements about money lost / not lost.
@@ -26,6 +34,12 @@ _LOSS_NEG = re.compile(
 _LOSS_POS = re.compile(r"\b(lost|debited|deducted|siphoned|withdrawn|transferred|paid)\b", re.I)
 # Statements about what the complainant shared / entered / clicked.
 _DISCLOSURE = re.compile(r"\b(share|shared|sharing|enter|entered|click|clicked|provide|provided|disclose|disclosed|gave|give|install|installed)\b", re.I)
+_DISCLOSURE_EQUIVALENTS = {
+    "share": re.compile(r"(?:shar|prov|gave|give|disc|साझा|शेयर|दिया|दिए|दी|दे\s*दिया|बताया|बताए|बता\s*दिया|डाला|डाले|दर्ज|diya|diye|de\s*diya|bheja|bataya|daal)", re.I),
+    "click": re.compile(r"(?:clic|open|क्लिक|खोला|खोले|khol)", re.I),
+    "install": re.compile(r"(?:inst|down|anydesk|teamviewer|quick\s*support|rustdesk|इंस्टॉल|डाउनलोड|karwaya)", re.I),
+    "enter": re.compile(r"(?:ente|type|fill|दर्ज|डाला|भरा|daal|bhara)", re.I),
+}
 _DATE = re.compile(
     r"\b(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}|\d{1,2}(st|nd|rd|th)? (of )?(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?( \d{4})?"
     r"|(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]* \d{1,2}(st|nd|rd|th)?(,? \d{4})?"
@@ -38,11 +52,22 @@ def _sentences(text: str) -> list[str]:
 
 
 def _user_mentions(user_text: str, verb_match: str, negated: bool) -> bool:
-    """True if the user said something with the same verb stem and the same polarity."""
-    stem = verb_match.lower()[:4]
-    for sent in re.split(r"(?<=[.!?\n])\s*", user_text):
-        if stem in sent.lower() and bool(_NEG.search(sent)) == negated:
-            return True
+    """True if the user said something with matching verb semantics and polarity in English, Hindi, or Hinglish."""
+    v = verb_match.lower()
+    cat = "share" if any(k in v for k in ("share", "provid", "give", "gave", "disclos")) else (
+        "click" if "click" in v else (
+            "install" if "install" in v else (
+                "enter" if "enter" in v else None
+            )
+        )
+    )
+    pat = _DISCLOSURE_EQUIVALENTS.get(cat) if cat else re.compile(re.escape(v[:4]), re.I)
+
+    for sent in re.split(r"(?<=[.!?।\n])\s*", user_text):
+        if pat.search(sent):
+            has_neg = bool(_NEG.search(sent))
+            if has_neg == negated:
+                return True
     return False
 
 
@@ -73,7 +98,7 @@ def validate_narrative(narrative: str, incident: IncidentData) -> tuple[str, lis
             continue
 
         m = _DISCLOSURE.search(sent)
-        if m and re.search(r"\b(i|we|me|my)\b", sent, re.I) and not _user_mentions(user_text, m.group(0), negated):
+        if m and re.search(r"\b(i|we|me|my|the complainant|complainant|the victim|victim|the user|user|he|she|they)\b", sent, re.I) and not _user_mentions(user_text, m.group(0), negated):
             notes.append(f"Removed claim about what the complainant did that the user did not state: {sent!r}")
             continue
 

@@ -19,6 +19,16 @@ class NotFoundError(AppError):
         super().__init__("not_found", f"{what} not found", 404)
 
 
+class UnauthorizedError(AppError):
+    def __init__(self, message: str = "Authentication required") -> None:
+        super().__init__("unauthorized", message, 401)
+
+
+class ForbiddenError(AppError):
+    def __init__(self, message: str = "You do not have permission to access this resource") -> None:
+        super().__init__("forbidden", message, 403)
+
+
 def _body(code: str, message: str, details: object | None = None) -> dict:
     return {"error": {"code": code, "message": message, "details": details}}
 
@@ -42,7 +52,7 @@ def register_error_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(StarletteHTTPException)
     async def _http(_: Request, exc: StarletteHTTPException) -> JSONResponse:
-        return JSONResponse(_body("http_error", str(exc.detail)), status_code=exc.status_code)
+        return JSONResponse(_body(exc.code if hasattr(exc, "code") else "http_error", str(exc.detail)), status_code=exc.status_code)
 
     @app.exception_handler(Exception)
     async def _unhandled(_: Request, exc: Exception) -> JSONResponse:

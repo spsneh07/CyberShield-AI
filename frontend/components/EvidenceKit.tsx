@@ -116,15 +116,31 @@ export function EvidenceKit({ files, onChange, checklist }: {
                 Recorded {new Date(f.recorded_at).toLocaleString()}
                 {f.last_modified && <> · file date on device {new Date(f.last_modified).toLocaleString()}</>}
               </p>
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <label className="text-xs text-slate-400">Evidence of
-                  <select value={f.checklist_item ?? ""} onChange={(e) => update(i, { checklist_item: e.target.value || null })}
-                    className="ml-1.5 max-w-[16rem] rounded-md border border-ink-600 bg-ink-950 px-1.5 py-1 text-xs text-white">
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                <label className="flex min-w-[200px] flex-1 flex-wrap items-center gap-1.5 text-xs text-slate-400">
+                  <span>Evidence of</span>
+                  <select
+                    value={f.checklist_item ?? ""}
+                    onChange={(e) => update(i, { checklist_item: e.target.value || null })}
+                    title={f.checklist_item ?? "Link this file to an item from the evidence checklist"}
+                    className="w-full rounded-md border border-ink-600 bg-ink-950 px-2 py-1 text-xs text-white focus:border-signal focus:outline-none sm:w-auto sm:max-w-md md:max-w-lg"
+                  >
                     <option value="">— not linked —</option>
-                    {checklist.map((c) => <option key={c.item} value={c.item}>{c.item}</option>)}
+                    {checklist.map((c) => (
+                      <option key={c.item} value={c.item} title={c.item}>
+                        {c.item}
+                      </option>
+                    ))}
                   </select>
                 </label>
-                <button type="button" className="text-xs text-slate-400 underline" onClick={() => { onChange(files.filter((_, j) => j !== i)); setManifest(null); }}>
+                <button
+                  type="button"
+                  className="shrink-0 text-xs text-slate-400 underline hover:text-danger"
+                  onClick={() => {
+                    onChange(files.filter((_, j) => j !== i));
+                    setManifest(null);
+                  }}
+                >
                   remove from list
                 </button>
               </div>

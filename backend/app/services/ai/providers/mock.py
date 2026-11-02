@@ -14,6 +14,7 @@ from typing import Any
 from app.services.ai.base import LLMProvider
 from app.services.classification.taxonomy import CATEGORIES, CATEGORY_BY_ID, label
 from app.services.incident.identifiers import extract_identifiers
+from app.services.language import current_language
 
 _INPUT_RE = re.compile(r"<input>\s*(.*?)\s*</input>", re.DOTALL)
 _SOURCE_RE = re.compile(r'<source id="([^"]*)" title="([^"]*)" organization="([^"]*)" url="([^"]*)">\s*(.*?)\s*</source>', re.DOTALL)
@@ -26,8 +27,19 @@ EVIDENCE_WORDS = {"screenshot": "Screenshots", "sms": "SMS/message", "message": 
 ACTION_PATTERNS = {r"block(ed)? (my )?(card|account)": "Blocked card/account", r"called (my )?bank|contacted (my )?bank": "Contacted bank",
                    r"changed (my )?password": "Changed password", r"reported|filed a complaint|complained": "Reported the incident",
                    r"blocked (the )?(number|contact|profile)": "Blocked the sender"}
-LOSS_RE = re.compile(r"\b(lost|debited|deducted|transferred|paid|sent (him|her|them)?\s*(money|rs|₹)|withdrawn|stolen money)\b", re.I)
-NO_LOSS_RE = re.compile(r"\b(didn'?t|did not|no|not)\b[^.]{0,30}\b(lose|lost|pay|paid|money|transfer|share|shared)\b", re.I)
+LOSS_RE = re.compile(
+    r"\b(lost|debited|deducted|transferred|paid|sent (him|her|them)?\s*(money|rs|₹)|withdrawn|stolen money|"
+    r"kat gaye|kat gaya|kata|kate|paise gaye|paise chale gaye|paisa gaya|nikal gaye|nikala|nikale|nuksan|loss hua|"
+    r"debit ho gaya|debit ho gaye|transfer ho gaya|transfer ho gaye|chori ho gaye|चले गए|चला गया|"
+    r"गंवा|गंवाया|खोया|कट|कटा|कटे|कटी|निकला|निकले|चोरी|नुकसान|डेबिट|हस्तांतरित|ट्रांसफर)\b",
+    re.I,
+)
+NO_LOSS_RE = re.compile(
+    r"(?:\b(didn'?t|did not|no|not)\b[^.]{0,30}\b(lose|lost|pay|paid|money|transfer|share|shared)\b|"
+    r"\b(koi\s*(?:nuksan|loss|paisa|paise)?\s*nahi|paise\s*nahi\s*kate|paisa\s*nahi\s*kata|debit\s*nahi|transfer\s*nahi)\b|"
+    r"(?:कोई\s*(?:नुकसान|पैसा|पैसे)?\s*नहीं|पैसे\s*नहीं\s*कटे|पैसा\s*नहीं\s*कटा|डेबिट\s*नहीं|ट्रांसफर\s*नहीं))",
+    re.I,
+)
 DATE_RE = re.compile(r"\b(today|yesterday(?: (?:morning|evening|night|afternoon))?|last (?:night|week|month)|\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{1,2}(?:st|nd|rd|th)? (?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*(?: \d{4})?|(?:on )?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)|\d{1,2}(?::\d{2})? ?(?:am|pm))\b", re.I)
 
 RED_FLAGS = [
@@ -91,20 +103,25 @@ class MockLLM(LLMProvider):
     def _intent(self, p: dict, _: list) -> dict:
         m = p.get("message", "").lower()
         rules = [
-            (r"complaint|draft|fir\b", "generate_complaint"),
-            (r"evidence|proof|what should i (keep|save)", "evidence_checklist"),
-            (r"tips|prevent|stay safe|protect myself|precaution", "safety_tips"),
-            (r"is this (a )?(scam|fraud|genuine|real|legit)|is it (a )?(scam|safe)|suspicious|check this", "check_message"),
+            (r"complaint|draft|fir\b|shikayat|शिकायत", "generate_complaint"),
+            (r"evidence|proof|what should i (keep|save)|saboot|सबूत", "evidence_checklist"),
+            (r"tips|prevent|stay safe|protect myself|precaution|surakshit|suraksha|सुझाव|सुरक्षा", "safety_tips"),
+            (r"is this (a )?(scam|fraud|genuine|real|legit)|is it (a )?(scam|safe)|suspicious|check this|kya ye (scam|fraud|sahi|fake)|kya yeh|क्या यह", "check_message"),
         ]
         for pat, intent in rules:
             if re.search(pat, m):
                 return {"intent": intent, "confidence": 0.7}
-        if re.search(r"^(hi|hello|hey|thanks|thank you|ok|okay)\b", m) and len(m) < 40:
+        if re.search(r"^(hi|hello|hey|thanks|thank you|ok|okay|namaste|dhanyawad)\b", m) and len(m) < 40:
             return {"intent": "smalltalk", "confidence": 0.8}
-        happened = re.search(r"\b(i|me|my|we)\b.*\b(received|got|lost|clicked|paid|shared|hacked|called|sent|someone|debited|scammed|cheated|asked)\b", m)
+        happened = re.search(
+            r"\b(i|me|my|we|mere|maine|mujhe|hum|humein|mera|meri|मेरे|मैंने|मुझे|हम|मेरा)\b.*"
+            r"\b(received|got|lost|clicked|paid|shared|hacked|called|sent|someone|debited|scammed|cheated|asked|"
+            r"call|debit|kat|nikal|bheja|diya|bataya|install|download|chori|kaha|कट|गए|दिया|लिया|आया|कहा)\b",
+            m,
+        )
         if happened:
             return {"intent": "provide_details" if p.get("has_active_incident") else "report_incident", "confidence": 0.7}
-        if re.search(r"^(what|how|why|can|should|where|who)\b", m):
+        if re.search(r"^(what|how|why|can|should|where|who|kya|kaise|kyun|kahan)\b", m):
             return {"intent": "question", "confidence": 0.6}
         return {"intent": "provide_details" if p.get("has_active_incident") else "report_incident", "confidence": 0.4}
 
@@ -196,14 +213,44 @@ class MockLLM(LLMProvider):
     def _guidance(self, p: dict, src: list) -> dict:
         inc = p.get("incident") or {}
         d = inc.get("description", "").lower()
+        is_hi = current_language() == "hi"
         actions = []
-        if inc.get("financial_loss"):
-            actions.append("Contact your bank immediately using the number on your card or the official app and ask them to block the card/account and dispute the transaction.")
-        if "otp" in d or "password" in d or "pin" in d:
-            actions.append("Change passwords/PINs for any account whose details or OTP may have been shared, starting with banking and email.")
-        if inc.get("urls") or "link" in d:
-            actions.append("Do not open the link again or enter any more details on that page.")
-        actions.append("Stop all communication with the suspected fraudster and do not send money to 'recover' losses.")
+        if is_hi:
+            if inc.get("financial_loss"):
+                actions.append("तुरंत अपने बैंक या भुगतान ऐप (UPI/वॉलेट) से संपर्क करें और खाते/कार्ड/UPI को ब्लॉक कराएं ताकि आगे नुकसान न हो।")
+            if "otp" in d or "password" in d or "pin" in d:
+                actions.append("जिन खातों या सेवाओं का पासवर्ड या ओटीपी साझा हुआ है, उन्हें तुरंत बदलें।")
+            if inc.get("urls") or "link" in d:
+                actions.append("संदिग्ध लिंक को दोबारा न खोलें और उस पर कोई विवरण न भरें।")
+            actions.append("जालसाज से तुरंत संपर्क बंद करें और पैसे वापस दिलाने के नाम पर किसी को कोई भुगतान न करें।")
+            security = [
+                "ईमेल, बैंकिंग और सोशल मीडिया खातों पर टू-फैक्टर ऑथेंटिकेशन (2FA) चालू करें।",
+                "हाल ही के लॉगिन और डिवाइस की समीक्षा करें और अज्ञात सत्रों से लॉग आउट करें।",
+                "बैंक और यूपीआई ऐप के लेन-देन इतिहास की जांच करें।",
+            ]
+            do_not = [
+                "चैट, संदेश या कॉल लॉग डिलीट न करें।",
+                "कोई अन्य ओटीपी, पिन या पासवर्ड किसी से साझा न करें।",
+                "पैसे वापस दिलाने का दावा करने वाले किसी भी व्यक्ति को शुल्क न दें।",
+            ]
+        else:
+            if inc.get("financial_loss"):
+                actions.append("Contact your bank immediately using the number on your card or the official app and ask them to block the card/account and dispute the transaction.")
+            if "otp" in d or "password" in d or "pin" in d:
+                actions.append("Change passwords/PINs for any account whose details or OTP may have been shared, starting with banking and email.")
+            if inc.get("urls") or "link" in d:
+                actions.append("Do not open the link again or enter any more details on that page.")
+            actions.append("Stop all communication with the suspected fraudster and do not send money to 'recover' losses.")
+            security = [
+                "Enable two-factor authentication on email, banking and social accounts.",
+                "Review recent logins/devices and sign out of unknown sessions.",
+                "Check bank and UPI app transaction history for unfamiliar activity.",
+            ]
+            do_not = [
+                "Do not delete the chats, messages or call logs.",
+                "Do not share any more OTPs, PINs or passwords.",
+                "Do not pay anyone who promises to recover your money for a fee.",
+            ]
         reporting = [re.sub(r"\s+", " ", sent).strip(" -*")
                      for s in src for line in s["text"].split("\n")[1:]  # skip the chunk's heading line
                      for sent in re.split(r"(?<=[.!?])\s+", line)
@@ -221,13 +268,14 @@ class MockLLM(LLMProvider):
             e["already_available"] = any(w in e["item"].lower() for w in have.split() if len(w) > 3)
         return {
             "immediate_actions": actions,
-            "security_steps": ["Enable two-factor authentication on email, banking and social accounts.",
-                               "Review recent logins/devices and sign out of unknown sessions.",
-                               "Check bank and UPI app transaction history for unfamiliar activity."],
-            "reporting_guidance": reporting or ["Report the incident through the official national cybercrime reporting channel or your local police station."],
+            "security_steps": security,
+            "reporting_guidance": reporting or (
+                ["राष्ट्रीय साइबर अपराध रिपोर्टिंग पोर्टल (cybercrime.gov.in) या 1930 पर तुरंत शिकायत दर्ज करें।"]
+                if is_hi
+                else ["Report the incident through the official national cybercrime reporting channel or your local police station."]
+            ),
             "evidence_checklist": evidence,
-            "do_not": ["Do not delete the chats, messages or call logs.", "Do not share any more OTPs, PINs or passwords.",
-                       "Do not pay anyone who promises to recover your money for a fee."],
+            "do_not": do_not,
             "source_ids": [s["id"] for s in src[:3]],
         }
 
@@ -267,20 +315,27 @@ class MockLLM(LLMProvider):
         return {"explanations": []}
 
     def _conversation(self, p: dict, src: list) -> dict:
+        is_hi = current_language() == "hi"
         intent = p.get("intent")
         if intent == "smalltalk":
-            return {"reply": "Hello! I can help you understand a suspicious message, report a cyber incident, preserve evidence, or draft a complaint. What happened?"}
+            reply = "नमस्ते! मैं संदिग्ध संदेशों को समझने, साइबर घटना की रिपोर्ट करने, सबूत सहेजने या शिकायत तैयार करने में आपकी मदद कर सकता हूँ। क्या हुआ?" if is_hi else "Hello! I can help you understand a suspicious message, report a cyber incident, preserve evidence, or draft a complaint. What happened?"
+            return {"reply": reply}
         if p.get("classification"):
             cls = p["classification"]
-            lines = [f"This looks most like **{label(cls['category'])}** (confidence {cls['confidence']:.0%})."]
+            header = f"यह घटना सबसे अधिक **{label(cls['category'])}** जैसी लगती है (सटीकता {cls['confidence']:.0%})।" if is_hi else f"This looks most like **{label(cls['category'])}** (confidence {cls['confidence']:.0%})."
+            lines = [header]
             acts = (p.get("top_actions") or [])[:3]
             if acts:
-                lines.append("Most urgent steps:\n" + "\n".join(f"{i+1}. {a}" for i, a in enumerate(acts)))
+                urgent_title = "सबसे ज़रूरी कदम:" if is_hi else "Most urgent steps:"
+                lines.append(f"{urgent_title}\n" + "\n".join(f"{i+1}. {a}" for i, a in enumerate(acts)))
             qs = p.get("follow_up_questions") or []
             if qs:
-                lines.append("To complete your report, could you tell me:\n" + "\n".join(f"- {q}" for q in qs))
+                q_title = "अपनी रिपोर्ट पूरी करने के लिए, क्या आप बता सकते हैं:" if is_hi else "To complete your report, could you tell me:"
+                lines.append(f"{q_title}\n" + "\n".join(f"- {q}" for q in qs))
             return {"reply": "\n\n".join(lines)}
         if src:
             body = " ".join(s["text"][:350] for s in src[:2])
-            return {"reply": f"{body}\n\n_Based on: {', '.join(s['title'] for s in src[:2])}_"}
-        return {"reply": "I couldn't find trusted material on that in my knowledge base. Could you describe what happened in more detail?"}
+            source_label = "स्रोत:" if is_hi else "Based on:"
+            return {"reply": f"{body}\n\n_{source_label} {', '.join(s['title'] for s in src[:2])}_"}
+        fallback = "मुझे अपने ज्ञानकोष में इस पर विश्वसनीय जानकारी नहीं मिली। क्या आप अधिक विस्तार से बता सकते हैं कि क्या हुआ था?" if is_hi else "I couldn't find trusted material on that in my knowledge base. Could you describe what happened in more detail?"
+        return {"reply": fallback}

@@ -39,6 +39,7 @@ class Orchestrator:
         conv = self.convs.get(conversation_id)
         if conv is None:
             raise NotFoundError("Conversation")
+        orig_lang = current_language()
         set_language(msg.language)
         history = self.convs.list_messages(conversation_id, limit=6)
         self.convs.add_message(conversation_id, "user", msg.content, intent=msg.action)
@@ -63,7 +64,7 @@ class Orchestrator:
 
         if intent in ("report_incident", "provide_details", "check_message"):
             existing = incident if intent == "provide_details" else None
-            out = self.p.analyze(msg.content, conversation_id, existing, emit=track)
+            out = self.p.analyze(msg.content, conversation_id, existing, user_id=conv.user_id, emit=track)
             incident = out["incident"]
             result.incident_id = incident.id
             result.incident, result.classification = out["data"], out["classification"]
@@ -113,6 +114,7 @@ class Orchestrator:
         result.stages = stages
         self.convs.add_message(conversation_id, "assistant", result.reply, intent=intent,
                                payload=result.model_dump(mode="json", exclude={"reply"}))
+        set_language(orig_lang)
         return result
 
     def _intent(self, message: str, has_incident: bool, history: list) -> str:

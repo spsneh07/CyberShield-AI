@@ -10,8 +10,8 @@ class ConversationRepository:
     def __init__(self, db: Session) -> None:
         self.db = db
 
-    def create(self, title: str | None = None) -> Conversation:
-        conv = Conversation(title=title or "New conversation")
+    def create(self, title: str | None = None, user_id: str | None = None) -> Conversation:
+        conv = Conversation(title=title or "New conversation", user_id=user_id)
         self.db.add(conv)
         self.db.commit()
         return conv

@@ -80,6 +80,7 @@ class ConversationOut(BaseModel):
     created_at: datetime
     messages: list[MessageOut] = Field(default_factory=list)
     incident_id: str | None = None
+    session_token: str | None = None
 
 
 class FeedbackIn(BaseModel):
