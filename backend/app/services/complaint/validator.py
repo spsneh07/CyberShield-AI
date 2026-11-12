@@ -92,6 +92,9 @@ def validate_narrative(narrative: str, incident: IncidentData) -> tuple[str, lis
         if _LOSS_NEG.search(sent) and incident.financial_loss is not False:
             notes.append(f"Removed unsupported claim that no money was lost: {sent!r}")
             continue
+        if incident.financial_loss is False and _LOSS_POS.search(sent) and not negated:
+            notes.append(f"Removed claim of financial loss because user denied financial loss: {sent!r}")
+            continue
         if (_LOSS_POS.search(sent) and not negated and incident.financial_loss is not True
                 and incident.amount is None and not re.search(r"\[[A-Z]", sent)):
             notes.append(f"Removed unsupported claim of financial loss: {sent!r}")

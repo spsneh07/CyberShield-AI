@@ -245,6 +245,18 @@ class Advisor:
             else:
                 if not any(re.search(r"\b(bank|payment app)\b", a, re.I) for a in g.immediate_actions):
                     g.immediate_actions.insert(0, URGENT_BANK_ACTION)
+        elif not incident.financial_loss:
+            _DEBIT_ACTION = re.compile(
+                r"\b(dispute the transaction|reverse (?:the )?(?:transaction|funds|debit)|unauthorized debit|recover losses|len-den rokne|लेन-देन रोकने|रिफंड)\b",
+                re.I,
+            )
+            g.immediate_actions = [a for a in g.immediate_actions if not _DEBIT_ACTION.search(a)]
+            if not g.immediate_actions:
+                g.immediate_actions = [
+                    "संदिग्ध से तुरंत संपर्क बंद करें और कोई पासवर्ड, पिन या ओटीपी साझा न करें।"
+                    if is_hi
+                    else "Stop all communication with the suspected fraudster and do not share any OTP, PIN or passwords."
+                ]
         if remote_installed(incident.description) and not any(re.search(r"\b(uninstall|remove|hata|अनइंस्टॉल|हटा|delete)\b", a, re.I) for a in g.immediate_actions):
             remote_action = (
                 "संदिग्ध रिमोट-एक्सेस ऐप (जैसे AnyDesk, TeamViewer) को तुरंत अनइंस्टॉल करें और किसी सुरक्षित डिवाइस से अपने पासवर्ड बदलें।"

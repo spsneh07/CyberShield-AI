@@ -63,14 +63,17 @@ class ComplaintGenerator:
         if not requests:
             requests = ["Register my complaint and investigate the matter."]
 
-        if incident.amount is not None:
+        if incident.amount is not None and incident.financial_loss is not False:
             loss = f"{incident.currency or '[CURRENCY]'} {incident.amount:,.2f}"
-        elif incident.financial_loss:
-            loss = "[AMOUNT LOST]"
         elif incident.financial_loss is False:
             loss = "No financial loss reported."
         else:
             loss = "[AMOUNT LOST, IF ANY]"
+
+        if incident.financial_loss is False:
+            requests = [r for r in requests if not re.search(r"(trace and freeze|recovery of funds|recover transferred|recover.*money)", r, re.I)]
+            if not requests:
+                requests = ["Register my complaint and investigate the matter."]
 
         subject = f"Complaint regarding {category} incident" + (f" via {incident.platform}" if incident.platform else "")
         evidence_lines = list(incident.evidence_available)

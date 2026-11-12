@@ -33,7 +33,8 @@ only the language the LLM writes in.
 |---|---|---|
 | **Red-flag highlighting** | Pasted SMS / WhatsApp / email / chat text is scanned with fixed regular-expression rules (English, romanised Hindi and some Devanagari phrasings) for 8 categories: OTP/PIN/password requests, urgency or threats, payment requests, links, impersonation claims, personal-information requests, app install / remote access, too-good-to-be-true offers. Each highlight is an exact substring with its category and a short explanation. An optional LLM pass may **only reword the explanation** of spans the rules already found; it cannot add, move or remove a span, and reworded text containing numbers, links or evidence-deletion advice is discarded. | `/check` page, Analysis tab; `services/scamcheck/red_flags.py` |
 | **Lookalike-URL analyser** | Static, offline analysis of the URL **text only**: it never opens, resolves or fetches the URL. Checks: HTTPS, registered domain vs subdomains, deep subdomains, many hyphens, look-alike character substitutions and one-character typos of brand names, punycode / non-Latin look-alikes, brand names on domains that are not that brand's (small reference list), unusual TLDs, link shorteners, embedded credentials (`user@host`), raw IP hosts, percent-encoding, redirect parameters, sensitive path words, executable downloads. Returns the normalised URL, domain, registered domain, each indicator with a severity, a score, a risk level (low / medium / high) and an explanation. An unfamiliar domain alone is **never** an indicator, and a low result is described as "not a verdict". | `/check?mode=url`; links inside checked messages; `services/scamcheck/url_analyzer.py` |
-| **English / Hindi replies** | A language selector (English, हिन्दी). For Hindi, the LLM is told to write user-facing prose (chat reply, explanation, guidance, awareness, red-flag rewording) in Hindi while keeping JSON keys, enum values, source ids, identifiers (phone numbers, URLs, emails, UPI IDs, transaction IDs, amounts) and `[PLACEHOLDERS]` unchanged. Extraction, classification and the complaint draft stay in English so structured fields, citations, provenance and the complaint validator keep working. All output guards still run, and the evidence-deletion guard also covers Hindi phrasing. | reply-language selector on `/assistant`; `services/language.py` |
+| **English / Hindi replies & Multilingual Input** | A language selector (English, हिन्दी). Supports incident input in English, Hindi (Devanagari), and Hinglish (Romanised). For Hindi, the LLM is told to write user-facing prose (chat reply, explanation, guidance, awareness, red-flag rewording) in Hindi while keeping JSON keys, enum values, source ids, identifiers (phone numbers, URLs, emails, UPI IDs, transaction IDs, amounts) and `[PLACEHOLDERS]` unchanged. Extraction, classification and the complaint draft stay in English so structured fields, citations, provenance and the complaint validator keep working. All output guards still run, and the evidence-deletion guard also covers Hindi phrasing. | reply-language selector on `/assistant`; `services/language.py` |
+| **Contradiction & Correction Reconciliation** | Detects multi-turn retractions or modifications of financial loss (e.g. reporting ₹5,000 lost, then clarifying that no money was lost). Explicitly acknowledges corrections, clears unconfirmed amounts, sets loss state to uncertain under conflict, asks decisive clarifying questions, and dynamically omits bank dispute/reversal instructions from guidance and complaints. | Multi-turn chat; `services/incident/extractor.py`, `services/guidance/advisor.py` |
 | **Evidence integrity kit** | The user adds screenshots, statements or recordings in the Evidence tab. Each file is fingerprinted with SHA-256 **in the browser**; only the name, size, type, times and fingerprint are sent, never the file. Files can be linked to evidence-checklist items. The server builds a manifest with its own SHA-256 so changes to the manifest are detected, and a **Verify** step reports whether a file is byte-for-byte identical to one recorded (also after renaming). Generated complaints list the files and fingerprints as **Annexure A**. A matching fingerprint shows a file is unchanged since it was recorded; it does not prove the content is genuine, and no legal admissibility is claimed. | Evidence tab on `/assistant`; `services/evidence/manifest.py` |
 
 ## Architecture & tech stack
@@ -158,8 +159,8 @@ cd ../frontend && npm run typecheck && npm run build
 
 | Folder | What | Needs |
 |---|---|---|
-| `tests/unit` | evidence manifest (deterministic digest, match / changed file / tampered manifest, complaint annexure without new placeholders), red-flag rules (exact spans; LLM may only reword), URL analyser (safe and suspicious examples, no network access), language instructions and guards on Hindi output, structured-output repair/fallback, extraction & classification scenarios, identifier grounding, complaint placeholders, guidance/awareness filters, evidence-destruction guard, log redaction | nothing |
-| `tests/integration` | Alembic migration on SQLite, KB ingestion, retrieval, dedupe, provenance, prompt-injection stripping, URL validation, re-embedding on model change, full API + SSE flow | nothing |
+| `tests/unit` | evidence manifest (deterministic digest, match / changed file / tampered manifest, complaint annexure without new placeholders), red-flag rules (exact spans; LLM may only reword), URL analyser (safe and suspicious examples, no network access), language instructions and guards on Hindi output, structured-output repair/fallback, extraction & classification scenarios, multi-turn contradiction regression tests, identifier grounding, complaint placeholders, guidance/awareness filters, evidence-destruction guard, log redaction | nothing |
+| `tests/integration` | Alembic migration on SQLite, session ownership & 401/403 authorization, KB ingestion, retrieval, dedupe, provenance, prompt-injection stripping, URL validation, re-embedding on model change, full API + SSE flow | nothing |
 | `tests/postgres` | pgvector extension, `vector(384)` column, HNSW index, stored vector norms, `<=>` search, embedding-mismatch guard, conversation persistence | PostgreSQL+pgvector test database (it is reset) |
 | `tests/real_provider` | semantic retrieval of a paraphrase; demo end to end with the real LLM: validated outputs, no invented facts, no unsupported URLs/helplines, no evidence-deletion advice, complaint identifiers | `.env` providers + `RUN_REAL_PROVIDER_TESTS=1` |
 
@@ -226,14 +227,12 @@ Interactive docs at http://localhost:8000/docs. Errors share one shape: `{"error
 - Output guards are rule-based (URL/helpline scrubbing, evidence-deletion filter, complaint-claim
   validator) and can miss paraphrases; the complaint validator is conservative and may also drop true
   statements the user phrased differently. Drafts must be reviewed before submission.
-- No authentication; conversations are anonymous by ID, and anyone with an ID can read or delete it. Do not deploy publicly as-is.
+- Authentication is session-based using anonymous bearer tokens with cryptographic SHA-256 hashing; conversations are strictly isolated to their token owner (unauthorized access returns 401/403). Multi-user production deployments should integrate an enterprise identity provider (OAuth/SSO).
 - Team-written summaries have no `last_verified` date yet and are shown as "not verified"; guidance says so. See
   [docs/guidance_evaluation.md](docs/guidance_evaluation.md) for the grounding, ambiguity and privacy changes and their evaluation.
-- Follow-up question signals (OTP shared, link clicked, loss stated/denied) are English rules.
+- Follow-up question signals and loss contradiction detection support English, Hindi (Devanagari), and Hinglish (Romanised).
 - Complainant details entered for a draft are stored in the draft text.
-- Replies in English or Hindi only. Extraction rules, the mock provider, baseline evidence items and the
-  complaint draft are English; Hindi output quality depends on the model and has not been measured.
-  India-focused guidance.
+- Multilingual understanding covers English, Hindi, and Hinglish incidents. User-facing replies support English and Hindi. The formal complaint draft remains in English for official law enforcement acceptance in India.
 - Red-flag and URL checks are fixed rules: they miss phrasings and tricks they don't list, can flag
   harmless messages that use the same words, and the brand list for URL checks is small. A clean result
   does not mean a message or link is safe. The URL analyser does not check reputation or blocklists.
@@ -244,7 +243,7 @@ Interactive docs at http://localhost:8000/docs. Errors share one shape: `{"error
 - It does not file complaints; users must submit through official channels.
 
 ## Future scope
-Authentication and user history; more regional languages (for example Tamil); a measured evaluation of
+User account history and persistent multi-session profiles; more regional languages (for example Tamil); a measured evaluation of
 the red-flag rules and URL analyser on a labelled dataset; voice input; OCR of
 screenshot evidence; ingestion of full official advisories with scheduled refresh; hybrid (BM25 + vector)
 retrieval and re-ranking; LLM-as-judge evaluation with a larger, human-labelled dataset; PDF export of the

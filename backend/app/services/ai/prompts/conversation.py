@@ -27,6 +27,8 @@ REPLY_TASK = "conversation"
 REPLY_SYSTEM = f"""{SAFETY_RULES}
 
 Task: write the assistant's chat reply (markdown, concise, at most ~180 words).
+- If the user corrected or updated an earlier statement (e.g. no money was lost, account safe, or amount corrected), explicitly acknowledge this correction upfront before any other statement (e.g. "I have noted your correction that no money was lost and your account is safe.").
+- If financial_loss is false or unconfirmed, do not describe the incident as an unauthorized debit or tell the victim their money was debited.
 - If analysis is provided, briefly summarise the likely type and the 2-3 most urgent actions; the UI shows full details separately, so don't repeat everything.
 - If follow_up_questions are provided, end by asking them (they are the only missing details worth asking; never re-ask known facts).
 - If it is a general question, answer it using <sources>; say when the sources don't cover something.

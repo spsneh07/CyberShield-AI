@@ -135,7 +135,7 @@ class MockLLM(LLMProvider):
         loss: bool | None = None
         if LOSS_RE.search(msg) or ids.amount:
             loss = True
-        if NO_LOSS_RE.search(msg) and not ids.amount:
+        if (NO_LOSS_RE.search(msg) or "safe" in low or "सुरक्षित" in msg) and not ids.amount:
             loss = False
         evidence = [v for k, v in EVIDENCE_WORDS.items() if k in low and re.search(r"\b(have|saved|took|kept|got)\b", low)]
         actions = [v for pat, v in ACTION_PATTERNS.items() if re.search(pat, low)]
@@ -154,15 +154,31 @@ class MockLLM(LLMProvider):
             return old
 
         description = (prev.get("description", "") + " " + msg).strip() if prev else msg
+        final_loss = merge("financial_loss", loss, "inferred")
+        final_amount = merge("amount", ids.amount)
+        final_curr = merge("currency", ids.currency, "inferred")
+        if loss is False:
+            final_loss = None if prev.get("financial_loss") is True else False
+            final_amount = None
+            final_curr = None
+            sources.pop("amount", None)
+        elif ids.amount is not None and prev.get("amount") is not None and ids.amount != prev.get("amount"):
+            final_amount = ids.amount
+            final_curr = ids.currency or "INR"
+            final_loss = True
+        elif prev.get("financial_loss") is False and loss is True:
+            final_loss = True
+            final_amount = ids.amount
+
         data = {
             "incident_type": prev.get("incident_type"),
             "subtype": prev.get("subtype"),
             "description": description,
             "date_time": merge("date_time", date.group(0) if date else None),
             "platform": merge("platform", platform, "inferred"),
-            "financial_loss": merge("financial_loss", loss, "inferred"),
-            "amount": merge("amount", ids.amount),
-            "currency": merge("currency", ids.currency, "inferred"),
+            "financial_loss": final_loss,
+            "amount": final_amount,
+            "currency": final_curr,
             "phone_numbers": merge("phone_numbers", ids.phone_numbers),
             "emails": merge("emails", ids.emails),
             "urls": merge("urls", ids.urls),
@@ -283,9 +299,14 @@ class MockLLM(LLMProvider):
         inc, cls = p.get("incident") or {}, p.get("classification") or {}
         when = inc.get("date_time") or "[DATE AND TIME]"
         via = inc.get("platform") or "[PLATFORM/MEDIUM]"
-        loss = (f"I lost {inc.get('currency') or ''} {inc['amount']:,.2f}." if inc.get("amount")
+        loss = (f"I lost {inc.get('currency') or ''} {inc['amount']:,.2f}." if inc.get("amount") and inc.get("financial_loss") is not False
+                else "No financial loss was suffered." if inc.get("financial_loss") is False
                 else "I lost [AMOUNT]." if inc.get("financial_loss") else "")
-        narrative = (f"On {when}, I was contacted via {via}. {inc.get('description', '').strip()} {loss}").strip()
+        desc = inc.get('description', '').strip()
+        # Clean narrative of contradictory earlier claims if loss is denied
+        if inc.get("financial_loss") is False:
+            desc = re.sub(r"Someone debited ₹?\s*[\d,]+\s*(?:from my bank account\.?)?", "", desc, flags=re.I).strip()
+        narrative = (f"On {when}, I was contacted via {via}. {desc} {loss}").strip()
         req = ["Register my complaint and investigate the incident.", "Take action against the persons responsible."]
         if inc.get("financial_loss"):
             req.append("Help trace and freeze the transferred funds and assist in their recovery.")
@@ -322,13 +343,33 @@ class MockLLM(LLMProvider):
             return {"reply": reply}
         if p.get("classification"):
             cls = p["classification"]
-            header = f"यह घटना सबसे अधिक **{label(cls['category'])}** जैसी लगती है (सटीकता {cls['confidence']:.0%})।" if is_hi else f"This looks most like **{label(cls['category'])}** (confidence {cls['confidence']:.0%})."
-            lines = [header]
+            inc = p.get("incident") or {}
+            qs = p.get("follow_up_questions") or []
+            lines = []
+            is_correction = (
+                p.get("loss_correction") in ("no_loss", "unsure")
+                or any("mistake" in q.lower() or "गलती" in q for q in qs)
+                or (inc.get("financial_loss") is False and any("money" in q.lower() or "पैसे" in q for q in qs))
+            )
+            if is_correction:
+                ack = (
+                    "समझ गया — मैंने आपका यह सुधार नोट कर लिया है कि कोई पैसा नहीं कटा है और आपका खाता सुरक्षित है।"
+                    if is_hi
+                    else "Understood — I have noted your correction that no money was lost and your account is safe."
+                )
+                lines.append(ack)
+                lines.append(
+                    "यह विवरण अपडेट कर दिया गया है (संदेहास्पद/अपुष्ट नुकसान)।"
+                    if is_hi
+                    else "Incident assessment updated (financial loss unconfirmed)."
+                )
+            else:
+                header = f"यह घटना सबसे अधिक **{label(cls['category'])}** जैसी लगती है (सटीकता {cls['confidence']:.0%})।" if is_hi else f"This looks most like **{label(cls['category'])}** (confidence {cls['confidence']:.0%})."
+                lines.append(header)
             acts = (p.get("top_actions") or [])[:3]
             if acts:
                 urgent_title = "सबसे ज़रूरी कदम:" if is_hi else "Most urgent steps:"
                 lines.append(f"{urgent_title}\n" + "\n".join(f"{i+1}. {a}" for i, a in enumerate(acts)))
-            qs = p.get("follow_up_questions") or []
             if qs:
                 q_title = "अपनी रिपोर्ट पूरी करने के लिए, क्या आप बता सकते हैं:" if is_hi else "To complete your report, could you tell me:"
                 lines.append(f"{q_title}\n" + "\n".join(f"- {q}" for q in qs))

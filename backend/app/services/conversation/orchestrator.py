@@ -133,6 +133,11 @@ class Orchestrator:
             ctx["top_actions"] = r.guidance.immediate_actions[:3] if r.guidance else []
         if r.awareness:
             ctx["awareness_headline"] = r.awareness.headline
+        loss_corr = getattr(r.incident, "_loss_correction", None) if r.incident else None
+        if loss_corr:
+            ctx["loss_correction"] = loss_corr
+        elif r.incident and r.incident.financial_loss is False and "mistake" in " ".join(r.follow_up_questions).lower():
+            ctx["loss_correction"] = "no_loss"
         sources: list[Citation] = r.sources
         try:
             return generate_structured(self.llm, task=prompt.REPLY_TASK, system=prompt.REPLY_SYSTEM,
